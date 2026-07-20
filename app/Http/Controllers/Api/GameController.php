@@ -64,7 +64,7 @@ class GameController extends Controller
             return response()->json(['status' => 'error', 'message' => 'ยอดเงินไม่เพียงพอ กรุณาฝากเงินก่อน'], 400);
         }
 
-        $ambUsername = $this->getAMBUsername($user->username);
+        $ambUsername = $this->getAMBUsername($user->username, $user->id);
         $isMobile = (bool) $request->input('isMobile', false);
         $callbackUrl = (string) ($request->input('callbackUrl') ?? config('app.url', ''));
         $sessionToken = substr(md5(uniqid(mt_rand(), true)), 0, 20);
@@ -184,8 +184,9 @@ class GameController extends Controller
     // =====================================================
     //  แปลง username
     // =====================================================
-    private function getAMBUsername(string $username): string
-    {
-        return strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $username));
-    }
+    private function getAMBUsername(string $username, ?int $userId = null): string
+   {
+    return 'sn' . str_pad($userId ?? 0, 5, '0', STR_PAD_LEFT);
+    // ผลลัพธ์: sn00001, sn00002, sn00003...
+   }
 }
