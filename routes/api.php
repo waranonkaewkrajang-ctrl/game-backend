@@ -28,9 +28,9 @@ Route::prefix('auth')->group(function () {
 //  GAME CALLBACK (ค่ายเกม AMB เรียกมา — Seamless Wallet)
 // =====================================================
 Route::prefix('game/callback')->group(function () {
-    Route::post('/balance', [GameController::class, 'getBalance']);
-    Route::post('/bet',     [GameController::class, 'bet']);
-    Route::post('/win',     [GameController::class, 'win']);
+    Route::post('/checkBalance', [GameController::class, 'getBalance']);
+    Route::post('/placeBets',    [GameController::class, 'bet']);
+    Route::post('/settleBets',   [GameController::class, 'win']);
 });
 
 // =====================================================

@@ -103,35 +103,86 @@ class GameController extends Controller
     public function getBalance(Request $request): JsonResponse
     {
         $result = $this->callbackService->getBalance($request->input('username'));
-        return response()->json($result);
+
+        $statusCode = ($result['status'] === 'success') ? 0 : 10001;
+
+        return response()->json([
+            'id'              => $request->input('id', uniqid()),
+            'statusCode'      => $statusCode,
+            'timestampMillis' => (int) round(microtime(true) * 1000),
+            'productId'       => $request->input('productId', ''),
+            'currency'        => $request->input('currency', 'THB'),
+            'balance'         => (float) ($result['balance'] ?? 0),
+            'username'        => $request->input('username', ''),
+        ]);
     }
 
     public function bet(Request $request): JsonResponse
     {
+        $username = $request->input('username');
+        $txns = $request->input('txns', []);
+        $txn = $txns[0] ?? [];
+
+        // ดึง balance ก่อนหัก
+        $user = \App\Models\User::where('amb_username', $username)->first();
+        $balanceBefore = $user ? $this->walletService->getBalance($user) : 0;
+
         $result = $this->callbackService->processBet([
-            'username'   => $request->input('username'),
-            'round_id'   => $request->input('roundId') ?? $request->input('round_id'),
-            'game_id'    => $request->input('gameCode') ?? $request->input('game_id'),
-            'provider'   => $request->input('productId') ?? $request->input('provider', 'AMB'),
-            'bet_amount' => $request->input('amount') ?? $request->input('bet_amount'),
+            'username'   => $username,
+            'round_id'   => $txn['roundId'] ?? $request->input('roundId'),
+            'game_id'    => $txn['gameCode'] ?? $request->input('gameCode'),
+            'provider'   => $request->input('productId', 'AMB'),
+            'bet_amount' => $txn['betAmount'] ?? $request->input('amount', 0),
             'raw'        => $request->all(),
         ]);
 
-        return response()->json($result);
+        $statusCode = ($result['status'] === 'success') ? 0 : 10001;
+        $balanceAfter = (float) ($result['balance'] ?? $balanceBefore);
+
+        return response()->json([
+            'id'              => $request->input('id', uniqid()),
+            'statusCode'      => $statusCode,
+            'timestampMillis' => (int) round(microtime(true) * 1000),
+            'productId'       => $request->input('productId', ''),
+            'currency'        => $request->input('currency', 'THB'),
+            'balanceBefore'   => (float) $balanceBefore,
+            'balanceAfter'    => (float) $balanceAfter,
+            'username'        => $username,
+        ]);
     }
 
     public function win(Request $request): JsonResponse
     {
+        $username = $request->input('username');
+        $txns = $request->input('txns', []);
+        $txn = $txns[0] ?? [];
+
+        // ดึง balance ก่อนจ่าย
+        $user = \App\Models\User::where('amb_username', $username)->first();
+        $balanceBefore = $user ? $this->walletService->getBalance($user) : 0;
+
         $result = $this->callbackService->processWin([
-            'username'   => $request->input('username'),
-            'round_id'   => $request->input('roundId') ?? $request->input('round_id'),
-            'game_id'    => $request->input('gameCode') ?? $request->input('game_id'),
-            'provider'   => $request->input('productId') ?? $request->input('provider', 'AMB'),
-            'win_amount' => $request->input('amount') ?? $request->input('win_amount'),
+            'username'   => $username,
+            'round_id'   => $txn['roundId'] ?? $request->input('roundId'),
+            'game_id'    => $txn['gameCode'] ?? $request->input('gameCode'),
+            'provider'   => $request->input('productId', 'AMB'),
+            'win_amount' => $txn['payoutAmount'] ?? $request->input('amount', 0),
             'raw'        => $request->all(),
         ]);
 
-        return response()->json($result);
+        $statusCode = ($result['status'] === 'success') ? 0 : 10001;
+        $balanceAfter = (float) ($result['balance'] ?? $balanceBefore);
+
+        return response()->json([
+            'id'              => $request->input('id', uniqid()),
+            'statusCode'      => $statusCode,
+            'timestampMillis' => (int) round(microtime(true) * 1000),
+            'productId'       => $request->input('productId', ''),
+            'currency'        => $request->input('currency', 'THB'),
+            'balanceBefore'   => (float) $balanceBefore,
+            'balanceAfter'    => (float) $balanceAfter,
+            'username'        => $username,
+        ]);
     }
 
     // =====================================================
