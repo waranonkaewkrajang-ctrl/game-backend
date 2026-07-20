@@ -14,7 +14,7 @@ class GameCallbackService
 
     public function getBalance(string $username): array
     {
-        $user = User::where('username', $username)->first();
+        $user = User::where('amb_username', $username)->first();
 
         if (!$user) {
             return ['status' => 'error', 'message' => 'USER_NOT_FOUND'];
@@ -28,7 +28,7 @@ class GameCallbackService
 
     public function processBet(array $data): array
     {
-        $user = User::where('username', $data['username'])->first();
+        $user = User::where('amb_username', $data['username'])->first();
 
         if (!$user || !$user->isActive()) {
             return ['status' => 'error', 'message' => 'USER_NOT_FOUND'];
@@ -78,7 +78,7 @@ class GameCallbackService
 
     public function processWin(array $data): array
     {
-        $user = User::where('username', $data['username'])->first();
+        $user = User::where('amb_username', $data['username'])->first();
 
         if (!$user) {
             return ['status' => 'error', 'message' => 'USER_NOT_FOUND'];
