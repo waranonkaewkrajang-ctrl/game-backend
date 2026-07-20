@@ -14,6 +14,10 @@ use App\Http\Controllers\Admin\AdminDepositController;
 use App\Http\Controllers\Admin\AdminWithdrawalController;
 use App\Http\Controllers\Admin\AdminPromotionController;
 use App\Http\Controllers\Admin\AdminReportController;
+use App\Http\Controllers\Api\BannerController;
+
+// API สำหรับฝั่งลูกค้า (ไม่ต้องล็อคอินแอดมินก็ดึงได้)
+Route::get('/banners', [BannerController::class, 'index']);
 
 // =====================================================
 //  PUBLIC ROUTES
@@ -115,6 +119,11 @@ Route::prefix('admin')->group(function () {
 
         // Dashboard
         Route::get('/dashboard', [AdminDashboardController::class, 'index']);
+
+        // 🟢 นำ Route แบนเนอร์มาวางไว้ตรงนี้ครับ 🟢
+        Route::get('/banners', [BannerController::class, 'adminIndex']);
+        Route::post('/banners', [BannerController::class, 'store']);
+        Route::delete('/banners/{id}', [BannerController::class, 'destroy']);
 
         // เพิ่ม Route สำหรับจัดการแอดมิน
         Route::get('/admins', [AdminUserController::class, 'getAdmins']); // ดูรายชื่อแอดมิน
