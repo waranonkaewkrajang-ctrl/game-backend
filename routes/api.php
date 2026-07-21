@@ -99,6 +99,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/games/history',      [GameController::class, 'history']);
     Route::post('/games/launch',      [GameController::class, 'launchGame']);
     Route::get('/games/history',      [GameController::class, 'history']);
+    Route::get('/games/product-images', [\App\Http\Controllers\Admin\AdminGameController::class, 'getProductImages']);
 });
 
 // =====================================================
@@ -213,6 +214,8 @@ Route::prefix('admin')->group(function () {
         Route::post('/games/{game}/toggle',   [\App\Http\Controllers\Admin\AdminGameController::class, 'toggleGame']);
         Route::post('/games/toggle-product',  [\App\Http\Controllers\Admin\AdminGameController::class, 'toggleProduct']);
         Route::get('/games/agent-credit',     [\App\Http\Controllers\Admin\AdminGameController::class, 'agentCredit']);
+        Route::get('/games/product-images',   [\App\Http\Controllers\Admin\AdminGameController::class, 'getProductImages']);
+        Route::post('/games/product-image',   [\App\Http\Controllers\Admin\AdminGameController::class, 'updateProductImage']);
 
     });
 });
