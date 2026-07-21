@@ -7,6 +7,7 @@ use App\Models\Game;
 use App\Services\AMBService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Models\ProductImage;
 
 class AdminGameController extends Controller
 {
@@ -162,5 +163,40 @@ class AdminGameController extends Controller
         }
 
         return response()->json(['status' => 'success', 'data' => $result['data']]);
+    }
+    /**
+     * ดึงรูปปกค่ายเกมทั้งหมด
+     */
+    public function getProductImages(): JsonResponse
+    {
+        $images = ProductImage::all()->keyBy('product_id');
+        return response()->json(['status' => 'success', 'data' => $images]);
+    }
+
+    /**
+     * อัปโหลด/เปลี่ยนรูปปกค่ายเกม
+     */
+    public function updateProductImage(Request $request): JsonResponse
+    {
+        $request->validate([
+            'product_id' => 'required|string',
+            'image'      => 'required|file|mimes:jpg,jpeg,png,gif,webp|max:2048',
+        ]);
+
+        $file = $request->file('image');
+        $filename = 'provider_' . strtolower($request->product_id) . '.' . $file->getClientOriginalExtension();
+        $file->move(public_path('uploads/providers'), $filename);
+        $imageUrl = '/uploads/providers/' . $filename;
+
+        $record = ProductImage::updateOrCreate(
+            ['product_id' => $request->product_id],
+            ['image_url'  => $imageUrl]
+        );
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => "อัปเดตรูปค่าย {$request->product_id} แล้ว",
+            'data'    => $record,
+        ]);
     }
 }
