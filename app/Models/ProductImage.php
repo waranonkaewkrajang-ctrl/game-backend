@@ -8,7 +8,7 @@ class ProductImage extends Model
 {
     protected $fillable = ['product_id', 'image_url'];
 
-    // 🟢 เพิ่มโค้ดตัวแปลงนี้เข้าไป
+    // 🟢 เปลี่ยนโค้ดตัวแปลงเป็นแบบนี้ เพื่อบังคับใช้ URL ของหลังบ้านเสมอ
     public function getImageUrlAttribute($value)
     {
         if (!$value) {
@@ -20,7 +20,13 @@ class ProductImage extends Model
             return $value;
         }
 
-        // แปลง path ให้เป็น URL เต็ม (กรณีเก็บไว้ในโฟลเดอร์ uploads โดยตรง)
-        return asset(ltrim($value, '/')); 
+        // ดึง URL จากไฟล์ .env (http://31.97.220.103)
+        $baseUrl = rtrim(config('app.url'), '/');
+        
+        // ลบ / ด้านหน้าออก ป้องกันสแลชเบิ้ล
+        $path = ltrim($value, '/');
+
+        // จัดการต่อ URL ให้สมบูรณ์
+        return $baseUrl . '/' . $path; 
     }
 }
