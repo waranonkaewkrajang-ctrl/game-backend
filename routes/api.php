@@ -19,6 +19,11 @@ use App\Http\Controllers\Api\BannerController;
 // API สำหรับฝั่งลูกค้า (ไม่ต้องล็อคอินแอดมินก็ดึงได้)
 Route::get('/banners', [BannerController::class, 'index']);
 
+Route::get('/maintenance/check', function () {
+    $mode = \App\Models\Setting::where('key', 'maintenance_mode')->value('value');
+    return response()->json(['maintenance' => $mode === 'true']);
+});
+
 // =====================================================
 //  PUBLIC ROUTES
 // =====================================================
