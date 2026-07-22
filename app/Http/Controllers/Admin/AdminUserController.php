@@ -49,10 +49,13 @@ class AdminUserController extends Controller
     public function update(Request $request, User $user): JsonResponse
     {
         $data = $request->validate([
-            'status'    => 'nullable|in:active,suspended,banned',
-            'full_name' => 'nullable|string|max:100',
-            'phone'     => 'nullable|string|max:20',
-        ]);
+    'status'       => 'nullable|in:active,suspended,banned',
+    'full_name'    => 'nullable|string|max:100',
+    'phone'        => 'nullable|string|max:20',
+    'bank_code'    => 'nullable|string|max:20',
+    'bank_account' => 'nullable|string|max:30',
+    'bank_name'    => 'nullable|string|max:100',
+]);
 
         $user->update(array_filter($data));
 
