@@ -38,6 +38,8 @@ class AdminWithdrawalController extends Controller
         try {
             $withdrawal = $this->withdrawalService->approve($withdrawal, $request->user()->id);
 
+            app(\App\Services\TelegramService::class)->notifyWithdraw($withdrawal->user->username, $withdrawal->amount);
+
             return response()->json([
                 'status'  => 'success',
                 'message' => 'อนุมัติถอนเงินสำเร็จ',

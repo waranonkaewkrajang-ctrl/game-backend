@@ -56,6 +56,9 @@ class AuthController extends Controller
 
         $this->walletService->createWallet($user);
 
+        app(\App\Services\TelegramService::class)->notifyRegister($user->username, $user->phone);
+
+
         $token = $user->createToken('auth-token')->plainTextToken;
 
         return response()->json([

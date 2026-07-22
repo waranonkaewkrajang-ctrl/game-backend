@@ -171,6 +171,15 @@ Route::prefix('admin')->group(function () {
             return response()->json(['message' => 'success']);
         });
 
+        Route::post('/settings/telegram-test', function (\Illuminate\Http\Request $request) {
+            $service = new \App\Services\TelegramService();
+            $result = $service->sendTest($request->bot_token, $request->chat_id);
+            if ($result) {
+                return response()->json(['status' => 'success', 'message' => 'ส่งสำเร็จ']);
+            }
+            return response()->json(['status' => 'error', 'message' => 'ส่งไม่สำเร็จ เช็ค Token กับ Chat ID'], 400);
+        });
+
         // Game (Admin) — AMB Seamless
         Route::get('/games/agent-credit', [GameController::class, 'agentCredit']);
         Route::get('/games/bet-records',  [GameController::class, 'betRecords']);

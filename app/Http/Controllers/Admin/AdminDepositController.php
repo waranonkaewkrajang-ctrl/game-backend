@@ -38,6 +38,8 @@ class AdminDepositController extends Controller
         try {
             $deposit = $this->depositService->approve($deposit, $request->user()->id);
 
+            app(\App\Services\TelegramService::class)->notifyDeposit($deposit->user->username, $deposit->amount);
+
             return response()->json([
                 'status'  => 'success',
                 'message' => 'อนุมัติฝากเงินสำเร็จ',
