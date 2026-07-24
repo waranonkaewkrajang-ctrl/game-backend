@@ -13,7 +13,7 @@ use Carbon\Carbon;
 class CalculateCashback extends Command
 {
     protected $signature = 'cashback:calculate {--date= : วันที่ต้องการคำนวณ (YYYY-MM-DD) ถ้าไม่ใส่จะใช้เมื่อวาน}';
-    protected $description = 'คำนวณยอดเสียรายวันแล้วเก็บเป็นรางวัลรอรับ';
+    protected $description = 'คำนวณยอดเสียรายวัน (cashback + referral) แล้วเก็บเป็นรางวัลรอรับ';
 
     public function handle()
     {
@@ -21,14 +21,10 @@ class CalculateCashback extends Command
             ? Carbon::parse($this->option('date'))
             : Carbon::yesterday();
 
-        $percent = (float) Setting::getValue('cashback_percent', 0);
+        $cashbackPercent = (float) Setting::getValue('cashback_percent', 0);
+        $referralPercent = (float) Setting::getValue('referral_percent', 0);
 
-        if ($percent <= 0) {
-            $this->warn("cashback_percent = 0 ไม่มีการจ่ายคืน");
-            return;
-        }
-
-        $this->info("คำนวณยอดเสีย วันที่ {$date->toDateString()} | คืน {$percent}%");
+        $this->info("วันที่ {$date->toDateString()} | คืนยอดเสีย {$cashbackPercent}% | ค่าแนะนำ {$referralPercent}%");
 
         // เช็คว่าคำนวณวันนี้ไปแล้วหรือยัง (กัน duplicate)
         $alreadyCalculated = Reward::where('type', 'cashback')
@@ -41,8 +37,10 @@ class CalculateCashback extends Command
         }
 
         $users = User::where('status', 'active')->get();
-        $totalPaid = 0;
-        $count = 0;
+        $cashbackCount = 0;
+        $cashbackTotal = 0;
+        $referralCount = 0;
+        $referralTotal = 0;
 
         foreach ($users as $user) {
             // รวม bet ทั้งหมดของวันนั้น
@@ -55,37 +53,76 @@ class CalculateCashback extends Command
 
             // ยอดเสีย = bet - win (ถ้าติดลบ = ได้กำไร ไม่ต้องจ่าย)
             $loss = $totalBet - $totalWin;
+
             if ($loss <= 0) continue;
 
-            // คำนวณ cashback
-            $cashback = round($loss * ($percent / 100), 2);
-            if ($cashback < 1) continue; // ต่ำกว่า 1 บาทไม่จ่าย
+            // === 1. คำนวณ Cashback (คืนยอดเสียให้ตัวเอง) ===
+            if ($cashbackPercent > 0) {
+                $cashback = round($loss * ($cashbackPercent / 100), 2);
 
-            try {
-                // เก็บเป็นรางวัลรอรับ (ไม่จ่ายตรงเข้ากระเป๋า)
-                Reward::create([
-                    'user_id'     => $user->id,
-                    'type'        => 'cashback',
-                    'amount'      => $cashback,
-                    'status'      => 'pending',
-                    'description' => "คืนยอดเสีย {$percent}% วันที่ {$date->toDateString()} (เสีย {$loss})",
-                    'meta'        => [
-                        'date'    => $date->toDateString(),
-                        'loss'    => $loss,
-                        'percent' => $percent,
-                        'bet'     => $totalBet,
-                        'win'     => $totalWin,
-                    ],
-                ]);
-                $totalPaid += $cashback;
-                $count++;
-                $this->line("  {$user->username}: เสีย {$loss} → รอรับ {$cashback}");
-            } catch (\Exception $e) {
-                Log::error("Cashback failed for user {$user->id}: " . $e->getMessage());
-                $this->error("  {$user->username}: ERROR - {$e->getMessage()}");
+                if ($cashback >= 1) {
+                    try {
+                        Reward::create([
+                            'user_id'     => $user->id,
+                            'type'        => 'cashback',
+                            'amount'      => $cashback,
+                            'status'      => 'pending',
+                            'description' => "คืนยอดเสีย {$cashbackPercent}% วันที่ {$date->toDateString()} (เสีย {$loss})",
+                            'meta'        => [
+                                'date'    => $date->toDateString(),
+                                'loss'    => $loss,
+                                'percent' => $cashbackPercent,
+                                'bet'     => $totalBet,
+                                'win'     => $totalWin,
+                            ],
+                        ]);
+                        $cashbackTotal += $cashback;
+                        $cashbackCount++;
+                        $this->line("  [Cashback] {$user->username}: เสีย {$loss} → รอรับ {$cashback}");
+                    } catch (\Exception $e) {
+                        Log::error("Cashback failed for user {$user->id}: " . $e->getMessage());
+                    }
+                }
+            }
+
+            // === 2. คำนวณ Referral (จ่ายค่าแนะนำให้คนที่แนะนำ user คนนี้) ===
+            if ($referralPercent > 0 && $user->referred_by) {
+                $referrer = User::find($user->referred_by);
+
+                if ($referrer && $referrer->isActive()) {
+                    $commission = round($loss * ($referralPercent / 100), 2);
+
+                    if ($commission >= 1) {
+                        try {
+                            Reward::create([
+                                'user_id'     => $referrer->id,
+                                'type'        => 'referral',
+                                'amount'      => $commission,
+                                'status'      => 'pending',
+                                'description' => "ค่าแนะนำ {$user->username} ยอดเสีย {$loss} ({$referralPercent}%)",
+                                'meta'        => [
+                                    'date'          => $date->toDateString(),
+                                    'from_user_id'  => $user->id,
+                                    'from_username' => $user->username,
+                                    'loss'          => $loss,
+                                    'percent'       => $referralPercent,
+                                    'bet'           => $totalBet,
+                                    'win'           => $totalWin,
+                                ],
+                            ]);
+                            $referralTotal += $commission;
+                            $referralCount++;
+                            $this->line("  [Referral] {$referrer->username} ← แนะนำ {$user->username} เสีย {$loss} → รอรับ {$commission}");
+                        } catch (\Exception $e) {
+                            Log::error("Referral failed for referrer {$referrer->id}: " . $e->getMessage());
+                        }
+                    }
+                }
             }
         }
 
-        $this->info("เสร็จสิ้น: สร้างรางวัลรอรับ {$count} คน รวม ฿{$totalPaid}");
+        $this->info("--- สรุป ---");
+        $this->info("Cashback: {$cashbackCount} คน รวม ฿{$cashbackTotal}");
+        $this->info("Referral: {$referralCount} คน รวม ฿{$referralTotal}");
     }
 }
