@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Reward;
+use App\Models\Setting;
 use App\Services\WalletService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class RewardController extends Controller
 {
@@ -14,21 +16,36 @@ class RewardController extends Controller
         private WalletService $walletService,
     ) {}
 
+    /**
+     * ดูยอดรอรับ (เฉพาะที่ยังไม่หมดอายุ)
+     */
     public function summary(Request $request)
     {
         $user = $request->user();
-        $cashbackPending = Reward::pendingAmount($user->id, 'cashback');
-        $referralPending = Reward::pendingAmount($user->id, 'referral');
+        $expireDays = (int) Setting::getValue('reward_expire_days', 0);
+
+        // ยอด pending ที่ยังไม่หมดอายุ
+        $cashbackPending = $this->getPendingAmount($user->id, 'cashback', $expireDays);
+        $referralPending = $this->getPendingAmount($user->id, 'referral', $expireDays);
+
+        // ยอดที่รับแล้ว
         $cashbackClaimed = (float) Reward::where('user_id', $user->id)
             ->where('type', 'cashback')->where('status', 'claimed')->sum('amount');
         $referralClaimed = (float) Reward::where('user_id', $user->id)
             ->where('type', 'referral')->where('status', 'claimed')->sum('amount');
 
+        // ยอดที่หมดอายุ
+        $cashbackExpired = (float) Reward::where('user_id', $user->id)
+            ->where('type', 'cashback')->where('status', 'expired')->sum('amount');
+        $referralExpired = (float) Reward::where('user_id', $user->id)
+            ->where('type', 'referral')->where('status', 'expired')->sum('amount');
+
         return response()->json([
             'status' => 'success',
             'data' => [
-                'cashback' => ['pending' => $cashbackPending, 'claimed' => $cashbackClaimed],
-                'referral' => ['pending' => $referralPending, 'claimed' => $referralClaimed],
+                'cashback' => ['pending' => $cashbackPending, 'claimed' => $cashbackClaimed, 'expired' => $cashbackExpired],
+                'referral' => ['pending' => $referralPending, 'claimed' => $referralClaimed, 'expired' => $referralExpired],
+                'expire_days' => $expireDays,
             ],
         ]);
     }
@@ -53,16 +70,26 @@ class RewardController extends Controller
         return response()->json(['status' => 'success', 'data' => $query->paginate(20)]);
     }
 
+    /**
+     * กดรับรางวัล (เฉพาะที่ยังไม่หมดอายุ)
+     */
     private function claimReward($user, string $type)
     {
         $typeName = $type === 'cashback' ? 'ยอดเสีย' : 'ค่าแนะนำเพื่อน';
+        $expireDays = (int) Setting::getValue('reward_expire_days', 0);
 
-        return DB::transaction(function () use ($user, $type, $typeName) {
-            $pendingRewards = Reward::where('user_id', $user->id)
+        return DB::transaction(function () use ($user, $type, $typeName, $expireDays) {
+            $query = Reward::where('user_id', $user->id)
                 ->where('type', $type)
                 ->where('status', 'pending')
-                ->lockForUpdate()
-                ->get();
+                ->lockForUpdate();
+
+            // ถ้าตั้งวันหมดอายุ → รับได้เฉพาะที่ยังไม่หมดอายุ
+            if ($expireDays > 0) {
+                $query->where('created_at', '>=', Carbon::now()->subDays($expireDays));
+            }
+
+            $pendingRewards = $query->get();
 
             if ($pendingRewards->isEmpty()) {
                 return response()->json(['status' => 'error', 'message' => "ไม่มี{$typeName}ที่รอรับ"], 400);
@@ -70,9 +97,8 @@ class RewardController extends Controller
 
             $totalAmount = $pendingRewards->sum('amount');
 
-            Reward::where('user_id', $user->id)
-                ->where('type', $type)
-                ->where('status', 'pending')
+            // อัปเดตเฉพาะรายการที่ยังไม่หมดอายุ
+            Reward::whereIn('id', $pendingRewards->pluck('id'))
                 ->update(['status' => 'claimed', 'claimed_at' => now()]);
 
             $this->walletService->addBonus(
@@ -91,5 +117,21 @@ class RewardController extends Controller
                 ],
             ]);
         });
+    }
+
+    /**
+     * ยอด pending ที่ยังไม่หมดอายุ
+     */
+    private function getPendingAmount(int $userId, string $type, int $expireDays): float
+    {
+        $query = Reward::where('user_id', $userId)
+            ->where('type', $type)
+            ->where('status', 'pending');
+
+        if ($expireDays > 0) {
+            $query->where('created_at', '>=', Carbon::now()->subDays($expireDays));
+        }
+
+        return (float) $query->sum('amount');
     }
 }

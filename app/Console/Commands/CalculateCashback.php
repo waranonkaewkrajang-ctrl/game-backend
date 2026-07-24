@@ -13,7 +13,7 @@ use Carbon\Carbon;
 class CalculateCashback extends Command
 {
     protected $signature = 'cashback:calculate {--date= : วันที่ต้องการคำนวณ (YYYY-MM-DD) ถ้าไม่ใส่จะใช้เมื่อวาน}';
-    protected $description = 'คำนวณยอดเสียรายวัน (cashback + referral) แล้วเก็บเป็นรางวัลรอรับ';
+    protected $description = 'คำนวณยอดเสียรายวัน (cashback + referral) แล้วเก็บเป็นรางวัลรอรับ + ลบรางวัลหมดอายุ';
 
     public function handle()
     {
@@ -23,8 +23,12 @@ class CalculateCashback extends Command
 
         $cashbackPercent = (float) Setting::getValue('cashback_percent', 0);
         $referralPercent = (float) Setting::getValue('referral_percent', 0);
+        $expireDays = (int) Setting::getValue('reward_expire_days', 0);
 
-        $this->info("วันที่ {$date->toDateString()} | คืนยอดเสีย {$cashbackPercent}% | ค่าแนะนำ {$referralPercent}%");
+        $this->info("วันที่ {$date->toDateString()} | คืนยอดเสีย {$cashbackPercent}% | ค่าแนะนำ {$referralPercent}% | หมดอายุ {$expireDays} วัน");
+
+        // === ลบรางวัลที่หมดอายุ ===
+        $this->expireOldRewards($expireDays);
 
         // เช็คว่าคำนวณวันนี้ไปแล้วหรือยัง (กัน duplicate)
         $alreadyCalculated = Reward::where('type', 'cashback')
@@ -124,5 +128,28 @@ class CalculateCashback extends Command
         $this->info("--- สรุป ---");
         $this->info("Cashback: {$cashbackCount} คน รวม ฿{$cashbackTotal}");
         $this->info("Referral: {$referralCount} คน รวม ฿{$referralTotal}");
+    }
+
+    /**
+     * เปลี่ยนรางวัลที่เกินกำหนดเป็น expired
+     */
+    private function expireOldRewards(int $expireDays): void
+    {
+        if ($expireDays <= 0) {
+            $this->line("  [Expire] ไม่ได้ตั้งวันหมดอายุ — ข้าม");
+            return;
+        }
+
+        $cutoff = Carbon::now()->subDays($expireDays);
+
+        $expiredCount = Reward::where('status', 'pending')
+            ->where('created_at', '<', $cutoff)
+            ->update(['status' => 'expired']);
+
+        if ($expiredCount > 0) {
+            $this->line("  [Expire] ลบรางวัลหมดอายุ {$expiredCount} รายการ (เกิน {$expireDays} วัน)");
+        } else {
+            $this->line("  [Expire] ไม่มีรางวัลหมดอายุ");
+        }
     }
 }
