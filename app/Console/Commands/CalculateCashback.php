@@ -47,11 +47,11 @@ class CalculateCashback extends Command
         foreach ($users as $user) {
             // รวม bet ทั้งหมดของวันนั้น
             $totalBet = GameLog::where('user_id', $user->id)
-                ->where('action', 'bet')->whereDate('created_at', $date)->sum('amount');
+                ->where('action', 'bet')->whereDate('created_at', $date)->sum('bet_amount');
 
             // รวม win ทั้งหมดของวันนั้น
             $totalWin = GameLog::where('user_id', $user->id)
-                ->where('action', 'win')->whereDate('created_at', $date)->sum('amount');
+                ->where('action', 'win')->whereDate('created_at', $date)->sum('win_amount');
 
             // ยอดเสีย = bet - win (ถ้าติดลบ = ได้กำไร ไม่ต้องจ่าย)
             $loss = $totalBet - $totalWin;
