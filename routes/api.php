@@ -114,7 +114,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // === Finance Settings (ลูกค้าดึงค่าตั้งการเงิน) ===
     Route::get('/finance/settings', function () {
-        $keys = ['min_deposit', 'max_deposit', 'min_withdraw', 'max_withdraw', 'deposit_banks', 'deposit_channels', 'deposit_amounts'];
+        $keys = ['min_deposit', 'max_deposit', 'min_withdraw', 'max_withdraw', 'deposit_banks', 'deposit_channels', 'deposit_amounts', 'truewallet_number'];
         $settings = \App\Models\Setting::whereIn('key', $keys)->pluck('value', 'key');
 
         $banks = json_decode($settings['deposit_banks'] ?? '[]', true) ?: [];
@@ -133,6 +133,7 @@ Route::middleware('auth:sanctum')->group(function () {
                 'banks'        => $activeBanks,
                 'channels'     => $channels,
                 'amounts'      => $amounts,
+                'truewallet_number' => $settings['truewallet_number'] ?? '',
             ],
         ]);
     });
