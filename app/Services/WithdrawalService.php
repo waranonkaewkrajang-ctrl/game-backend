@@ -2,108 +2,93 @@
 
 namespace App\Services;
 
+use App\Models\Deposit;
+use App\Models\Setting;
 use App\Models\User;
-use App\Models\Withdrawal;
 use Illuminate\Support\Str;
 
-class WithdrawalService
+class DepositService
 {
     public function __construct(
         private WalletService $walletService,
     ) {}
 
-    public function createRequest(User $user, float $amount): Withdrawal
+    public function createRequest(User $user, array $data): Deposit
     {
-        $hasPending = Withdrawal::where('user_id', $user->id)
-            ->whereIn('status', ['pending', 'processing'])
-            ->exists();
+        $amount = (float) $data['amount'];
 
-        if ($hasPending) {
-            throw new \Exception('มีรายการถอนที่รอดำเนินการอยู่แล้ว');
+        // ตรวจสอบขั้นต่ำ-สูงสุดจาก settings
+        $minDeposit = (float) Setting::getValue('min_deposit', 100);
+        $maxDeposit = (float) Setting::getValue('max_deposit', 200000);
+
+        if ($amount < $minDeposit) {
+            throw new \Exception("ฝากขั้นต่ำ {$minDeposit} บาท");
         }
 
-        $this->checkTurnoverRequirement($user);
-
-        $wallet = $user->wallet;
-        if (!$wallet || !$wallet->hasEnough($amount)) {
-            throw new \Exception('ยอดเงินไม่เพียงพอ');
+        if ($amount > $maxDeposit) {
+            throw new \Exception("ฝากสูงสุด {$maxDeposit} บาท");
         }
 
-        $balanceBefore = $wallet->balance;
+        // ตรวจสอบว่าช่องทางเปิดอยู่ไหม
+        $enabledChannels = json_decode(Setting::getValue('deposit_channels', '["bank_transfer","promptpay","truewallet"]'), true) ?: ['bank_transfer', 'promptpay', 'truewallet'];
 
-        $this->walletService->withdraw(
-            $user,
-            $amount,
-            'ถอนเงิน (รอตรวจสอบ)',
-            ['type' => 'withdrawal_request']
-        );
+        if (!in_array($data['channel'], $enabledChannels)) {
+            throw new \Exception('ช่องทางนี้ปิดให้บริการชั่วคราว');
+        }
 
-        $balanceAfter = $user->wallet->fresh()->balance;
-
-        return Withdrawal::create([
-            'user_id'        => $user->id,
-            'reference_id'   => 'WDR-' . now()->format('Ymd') . '-' . strtoupper(Str::random(10)),
-            'amount'         => $amount,
-            'to_bank'        => $user->bank_code,
-            'to_account'     => $user->bank_account,
-            'to_name'        => $user->bank_name,
-            'status'         => 'pending',
-            'balance_before' => $balanceBefore,
-            'balance_after'  => $balanceAfter,
+        return Deposit::create([
+            'user_id'      => $user->id,
+            'reference_id' => 'DEP-' . now()->format('Ymd') . '-' . strtoupper(Str::random(10)),
+            'amount'       => $amount,
+            'channel'      => $data['channel'],
+            'from_bank'    => $data['from_bank'] ?? null,
+            'from_account' => $data['from_account'] ?? null,
+            'to_bank'      => $data['to_bank'] ?? null,
+            'to_account'   => $data['to_account'] ?? null,
+            'slip_url'     => $data['slip_url'] ?? null,
+            'promotion_id' => $data['promotion_id'] ?? null,
+            'status'       => 'pending',
         ]);
     }
 
-    public function approve(Withdrawal $withdrawal, int $adminId): Withdrawal
+    public function approve(Deposit $deposit, int $adminId): Deposit
     {
-        if (!in_array($withdrawal->status, ['pending', 'processing'])) {
+        if ($deposit->status !== 'pending') {
             throw new \Exception('รายการนี้ถูกดำเนินการแล้ว');
         }
 
-        $withdrawal->update([
+        $user = $deposit->user;
+
+        $this->walletService->deposit(
+            $user,
+            $deposit->amount,
+            'ฝากเงิน #' . $deposit->reference_id,
+            ['deposit_id' => $deposit->id],
+            $adminId
+        );
+
+        $deposit->update([
             'status'      => 'approved',
             'approved_by' => $adminId,
             'approved_at' => now(),
         ]);
 
-        return $withdrawal->fresh();
+        return $deposit->fresh();
     }
 
-    public function reject(Withdrawal $withdrawal, int $adminId, string $reason): Withdrawal
+    public function reject(Deposit $deposit, int $adminId, string $reason): Deposit
     {
-        if (!in_array($withdrawal->status, ['pending', 'processing'])) {
+        if ($deposit->status !== 'pending') {
             throw new \Exception('รายการนี้ถูกดำเนินการแล้ว');
         }
 
-        $this->walletService->deposit(
-            $withdrawal->user,
-            $withdrawal->amount,
-            'คืนเงินถอน (ปฏิเสธ) #' . $withdrawal->reference_id,
-            ['withdrawal_id' => $withdrawal->id, 'reason' => $reason],
-            $adminId
-        );
-
-        $withdrawal->update([
+        $deposit->update([
             'status'        => 'rejected',
             'reject_reason' => $reason,
             'approved_by'   => $adminId,
             'approved_at'   => now(),
         ]);
 
-        return $withdrawal->fresh();
-    }
-
-    private function checkTurnoverRequirement(User $user): void
-    {
-        $activeClaim = $user->promotionClaims()
-            ->where('status', 'active')
-            ->where('turnover_completed', false)
-            ->first();
-
-        if ($activeClaim) {
-            $remaining = bcsub($activeClaim->turnover_required, $activeClaim->turnover_current, 2);
-            throw new \Exception(
-                'ยังทำ turnover ไม่ครบ (เหลืออีก ' . number_format($remaining, 2) . ' บาท)'
-            );
-        }
+        return $deposit->fresh();
     }
 }

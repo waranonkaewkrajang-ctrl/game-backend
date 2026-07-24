@@ -111,6 +111,31 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/rewards/claim/cashback', [\App\Http\Controllers\Api\RewardController::class, 'claimCashback']);
     Route::post('/rewards/claim/referral', [\App\Http\Controllers\Api\RewardController::class, 'claimReferral']);
     Route::get('/rewards/history', [\App\Http\Controllers\Api\RewardController::class, 'history']);
+
+    // === Finance Settings (ลูกค้าดึงค่าตั้งการเงิน) ===
+    Route::get('/finance/settings', function () {
+        $keys = ['min_deposit', 'max_deposit', 'min_withdraw', 'max_withdraw', 'deposit_banks', 'deposit_channels', 'deposit_amounts'];
+        $settings = \App\Models\Setting::whereIn('key', $keys)->pluck('value', 'key');
+
+        $banks = json_decode($settings['deposit_banks'] ?? '[]', true) ?: [];
+        $channels = json_decode($settings['deposit_channels'] ?? '["bank_transfer","promptpay","truewallet"]', true) ?: ['bank_transfer', 'promptpay', 'truewallet'];
+        $amounts = json_decode($settings['deposit_amounts'] ?? '[100,300,500,1000,5000]', true) ?: [100, 300, 500, 1000, 5000];
+
+        $activeBanks = array_values(array_filter($banks, fn($b) => $b['is_active'] ?? false));
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'min_deposit'  => (float) ($settings['min_deposit'] ?? 100),
+                'max_deposit'  => (float) ($settings['max_deposit'] ?? 200000),
+                'min_withdraw' => (float) ($settings['min_withdraw'] ?? 300),
+                'max_withdraw' => (float) ($settings['max_withdraw'] ?? 200000),
+                'banks'        => $activeBanks,
+                'channels'     => $channels,
+                'amounts'      => $amounts,
+            ],
+        ]);
+    });
 });
 
 // =====================================================

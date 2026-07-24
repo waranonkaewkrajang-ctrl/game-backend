@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Deposit;
+use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Support\Str;
 
@@ -14,10 +15,31 @@ class DepositService
 
     public function createRequest(User $user, array $data): Deposit
     {
+        $amount = (float) $data['amount'];
+
+        // ตรวจสอบขั้นต่ำ-สูงสุดจาก settings
+        $minDeposit = (float) Setting::getValue('min_deposit', 100);
+        $maxDeposit = (float) Setting::getValue('max_deposit', 200000);
+
+        if ($amount < $minDeposit) {
+            throw new \Exception("ฝากขั้นต่ำ {$minDeposit} บาท");
+        }
+
+        if ($amount > $maxDeposit) {
+            throw new \Exception("ฝากสูงสุด {$maxDeposit} บาท");
+        }
+
+        // ตรวจสอบว่าช่องทางเปิดอยู่ไหม
+        $enabledChannels = json_decode(Setting::getValue('deposit_channels', '["bank_transfer","promptpay","truewallet"]'), true) ?: ['bank_transfer', 'promptpay', 'truewallet'];
+
+        if (!in_array($data['channel'], $enabledChannels)) {
+            throw new \Exception('ช่องทางนี้ปิดให้บริการชั่วคราว');
+        }
+
         return Deposit::create([
             'user_id'      => $user->id,
             'reference_id' => 'DEP-' . now()->format('Ymd') . '-' . strtoupper(Str::random(10)),
-            'amount'       => $data['amount'],
+            'amount'       => $amount,
             'channel'      => $data['channel'],
             'from_bank'    => $data['from_bank'] ?? null,
             'from_account' => $data['from_account'] ?? null,
