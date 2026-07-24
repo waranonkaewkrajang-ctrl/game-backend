@@ -105,6 +105,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/games/launch',      [GameController::class, 'launchGame']);
     Route::get('/games/history',      [GameController::class, 'history']);
     Route::get('/games/product-images', [\App\Http\Controllers\Admin\AdminGameController::class, 'getProductImages']);
+
+    // === Rewards (ยอดเสีย + แนะนำเพื่อน) ===
+    Route::get('/rewards/summary', [\App\Http\Controllers\Api\RewardController::class, 'summary']);
+    Route::post('/rewards/claim/cashback', [\App\Http\Controllers\Api\RewardController::class, 'claimCashback']);
+    Route::post('/rewards/claim/referral', [\App\Http\Controllers\Api\RewardController::class, 'claimReferral']);
+    Route::get('/rewards/history', [\App\Http\Controllers\Api\RewardController::class, 'history']);
 });
 
 // =====================================================

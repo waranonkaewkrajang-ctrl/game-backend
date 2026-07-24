@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\GameLog;
+use App\Models\Reward;
+use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
 
@@ -56,6 +58,9 @@ class GameCallbackService
                 $data['provider'],
                 $data['raw'] ?? []
             );
+
+            // === คำนวณค่าแนะนำเพื่อน ===
+            $this->processReferralCommission($user, (float) $data['bet_amount'], $data['provider'], $data['game_id']);
 
             return [
                 'status'  => 'success',
@@ -122,6 +127,50 @@ class GameCallbackService
                 'status'  => 'error',
                 'message' => $e->getMessage(),
             ];
+        }
+    }
+
+    /**
+     * คำนวณค่าแนะนำเพื่อน — เก็บเป็นรางวัลรอรับ
+     */
+    private function processReferralCommission(User $user, float $betAmount, string $provider, string $gameId): void
+    {
+        try {
+            // เช็คว่ามีคนแนะนำไหม
+            if (!$user->referred_by) return;
+
+            $referrer = User::find($user->referred_by);
+            if (!$referrer || !$referrer->isActive()) return;
+
+            // ดึง % ค่าแนะนำ
+            $percent = (float) Setting::getValue('referral_percent', 0);
+            if ($percent <= 0) return;
+
+            $commission = round($betAmount * ($percent / 100), 2);
+            if ($commission < 0.01) return;
+
+            // เก็บเป็นรางวัลรอรับ (ไม่จ่ายตรงเข้ากระเป๋า)
+            Reward::create([
+                'user_id'     => $referrer->id,
+                'type'        => 'referral',
+                'amount'      => $commission,
+                'status'      => 'pending',
+                'description' => "ค่าแนะนำ {$user->username} เดิมพัน {$provider} ({$percent}%)",
+                'meta'        => [
+                    'from_user_id'  => $user->id,
+                    'from_username' => $user->username,
+                    'bet_amount'    => $betAmount,
+                    'percent'       => $percent,
+                    'provider'      => $provider,
+                    'game_id'       => $gameId,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Referral commission failed: " . $e->getMessage(), [
+                'user_id'   => $user->id,
+                'referrer'  => $user->referred_by,
+                'betAmount' => $betAmount,
+            ]);
         }
     }
 
