@@ -65,6 +65,11 @@ class GameController extends Controller
         }
 
         $ambUsername = $this->getAMBUsername($user->username, $user->id);
+        
+        // บันทึก amb_username ถ้ายังไม่มี
+        if (!$user->amb_username) {
+            $user->update(['amb_username' => $ambUsername]);
+        }
         $isMobile = (bool) $request->input('isMobile', false);
         $callbackUrl = (string) ($request->input('callbackUrl') ?? config('app.url', ''));
         $sessionToken = substr(md5(uniqid(mt_rand(), true)), 0, 20);
