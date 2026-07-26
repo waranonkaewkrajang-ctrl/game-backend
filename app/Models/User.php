@@ -15,7 +15,7 @@ class User extends Authenticatable
         'username', 'phone', 'password', 'full_name', 'line_id',
         'bank_code', 'bank_account', 'bank_name',
         'status', 'is_verified', 'referral_code', 'referred_by',
-        'last_login_ip', 'last_login_at',
+        'last_login_ip', 'last_login_at', 'amb_username',
     ];
 
     protected $hidden = ['password'];
