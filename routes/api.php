@@ -112,6 +112,52 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/rewards/claim/referral', [\App\Http\Controllers\Api\RewardController::class, 'claimReferral']);
     Route::get('/rewards/history', [\App\Http\Controllers\Api\RewardController::class, 'history']);
 
+    // === User Rank ===
+    Route::get('/user/rank', function (\Illuminate\Http\Request $request) {
+        $user = $request->user();
+        
+        $totalDeposit = (float) \App\Models\Deposit::where('user_id', $user->id)
+            ->where('status', 'approved')
+            ->sum('amount');
+
+        $ranks = json_decode(\App\Models\Setting::getValue('ranks', '[]'), true) ?: [];
+        
+        usort($ranks, fn($a, $b) => ($b['min_deposit'] ?? 0) - ($a['min_deposit'] ?? 0));
+
+        $currentRank = null;
+        $nextRank = null;
+
+        foreach ($ranks as $rank) {
+            if ($totalDeposit >= ($rank['min_deposit'] ?? 0)) {
+                $currentRank = $rank;
+                break;
+            }
+        }
+
+        if ($currentRank) {
+            $ranks2 = json_decode(\App\Models\Setting::getValue('ranks', '[]'), true) ?: [];
+            usort($ranks2, fn($a, $b) => ($a['min_deposit'] ?? 0) - ($b['min_deposit'] ?? 0));
+            foreach ($ranks2 as $r) {
+                if (($r['min_deposit'] ?? 0) > ($currentRank['min_deposit'] ?? 0)) {
+                    $nextRank = $r;
+                    break;
+                }
+            }
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'total_deposit' => $totalDeposit,
+                'current_rank' => $currentRank,
+                'next_rank' => $nextRank,
+                'progress' => $nextRank
+                    ? min(100, round(($totalDeposit / ($nextRank['min_deposit'] ?? 1)) * 100, 1))
+                    : 100,
+            ],
+        ]);
+    });
+
     // === Finance Settings (ลูกค้าดึงค่าตั้งการเงิน) ===
     Route::get('/finance/settings', function () {
         $keys = ['min_deposit', 'max_deposit', 'min_withdraw', 'max_withdraw', 'deposit_banks', 'deposit_channels', 'deposit_amounts', 'truewallet_accounts'];
@@ -134,6 +180,7 @@ Route::middleware('auth:sanctum')->group(function () {
                 'channels'     => $channels,
                 'amounts'      => $amounts,
                 'truewallet_accounts' => json_decode($settings['truewallet_accounts'] ?? '[]', true) ?: [],
+                'ranks' => json_decode(\App\Models\Setting::getValue('ranks', '[]'), true) ?: [],
             ],
         ]);
     });
