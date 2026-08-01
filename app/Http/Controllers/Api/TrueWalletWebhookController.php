@@ -41,7 +41,7 @@ class TrueWalletWebhookController extends Controller
 
         Log::info('TrueWallet Webhook', $data);
 
-        $amount        = floatval($data['amount'] ?? 0);
+        $amount        = floatval($data['amount'] ?? 0) / 100;
         $senderMobile  = $data['sender_mobile'] ?? '';
         $eventType     = $data['event_type'] ?? '';
         $receivedTime  = $data['received_time'] ?? now();
