@@ -25,9 +25,10 @@ class TrueWalletWebhookController extends Controller
             return response()->json(['status' => 'ok']);
         }
 
-        // Decode JWT
         try {
-            $token  = $request->getContent();
+            $raw = $request->getContent();
+            $json = json_decode($raw, true);
+            $token = $json['message'] ?? $raw;
             $decoded = JWT::decode($token, new Key($secret, 'HS256'));
             $data   = (array) $decoded;
         } catch (\Exception $e) {
