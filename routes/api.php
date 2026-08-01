@@ -236,6 +236,8 @@ Route::prefix('admin')->group(function () {
         Route::get('/withdrawals',                       [AdminWithdrawalController::class, 'index']);
         Route::post('/withdrawals/{withdrawal}/approve', [AdminWithdrawalController::class, 'approve']);
         Route::post('/withdrawals/{withdrawal}/reject',  [AdminWithdrawalController::class, 'reject']);
+        Route::post('/withdrawals/{withdrawal}/lock',   [AdminWithdrawalController::class, 'lock']);
+        Route::post('/withdrawals/{withdrawal}/unlock', [AdminWithdrawalController::class, 'unlock']);
 
         // Promotions
         Route::apiResource('/promotions', AdminPromotionController::class);
