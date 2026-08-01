@@ -34,6 +34,12 @@ Route::prefix('auth')->group(function () {
 });
 
 // =====================================================
+//  TRUEWALLET WEBHOOK
+// =====================================================
+Route::post('/truewallet/webhook', [\App\Http\Controllers\Api\TrueWalletWebhookController::class, 'webhook']);
+
+
+// =====================================================
 //  GAME CALLBACK (ค่ายเกม AMB เรียกมา — Seamless Wallet)
 // =====================================================
 Route::prefix('game/callback')->group(function () {
@@ -299,6 +305,13 @@ Route::prefix('admin')->group(function () {
             }
             return response()->json(['data' => $query->paginate(50)]);
         });
+
+        // TrueWallet เดินบัญชี
+        Route::get('/truewallet/transactions', [\App\Http\Controllers\Admin\AdminTruewalletController::class, 'index']);
+        Route::get('/truewallet/summary',      [\App\Http\Controllers\Admin\AdminTruewalletController::class, 'summary']);
+        Route::get('/truewallet/unmatched',     [\App\Http\Controllers\Admin\AdminTruewalletController::class, 'unmatched']);
+        Route::post('/truewallet/{id}/match',   [\App\Http\Controllers\Admin\AdminTruewalletController::class, 'match']);
+        Route::post('/truewallet/{id}/ignore',  [\App\Http\Controllers\Admin\AdminTruewalletController::class, 'ignore']);
 
         // Game Management (Admin)
         Route::get('/games',                  [\App\Http\Controllers\Admin\AdminGameController::class, 'index']);
