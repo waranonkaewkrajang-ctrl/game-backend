@@ -74,6 +74,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/withdrawals',               [WithdrawalController::class, 'index']);
     Route::get('/withdrawals/{withdrawal}',  [WithdrawalController::class, 'show']);
 
+    // วงล้อ
+    Route::get('/spin-wheel',         [\App\Http\Controllers\Api\SpinWheelController::class, 'index']);
+    Route::post('/spin-wheel/spin',   [\App\Http\Controllers\Api\SpinWheelController::class, 'spin']);
+    Route::get('/spin-wheel/history', [\App\Http\Controllers\Api\SpinWheelController::class, 'history']);
+
     // Promotions
     Route::get('/promotions',                        [PromotionController::class, 'index']);
     Route::get('/promotions/{promotion}',            [PromotionController::class, 'show']);
@@ -314,6 +319,16 @@ Route::prefix('admin')->group(function () {
         Route::get('/truewallet/unmatched',     [\App\Http\Controllers\Admin\AdminTruewalletController::class, 'unmatched']);
         Route::post('/truewallet/{id}/match',   [\App\Http\Controllers\Admin\AdminTruewalletController::class, 'match']);
         Route::post('/truewallet/{id}/ignore',  [\App\Http\Controllers\Admin\AdminTruewalletController::class, 'ignore']);
+
+        // วงล้อ (Admin)
+        Route::get('/spin-wheel/prizes',           [\App\Http\Controllers\Admin\AdminSpinWheelController::class, 'prizes']);
+        Route::post('/spin-wheel/prizes',          [\App\Http\Controllers\Admin\AdminSpinWheelController::class, 'storePrize']);
+        Route::put('/spin-wheel/prizes/{id}',      [\App\Http\Controllers\Admin\AdminSpinWheelController::class, 'updatePrize']);
+        Route::delete('/spin-wheel/prizes/{id}',   [\App\Http\Controllers\Admin\AdminSpinWheelController::class, 'destroyPrize']);
+        Route::get('/spin-wheel/settings',         [\App\Http\Controllers\Admin\AdminSpinWheelController::class, 'settings']);
+        Route::post('/spin-wheel/settings',        [\App\Http\Controllers\Admin\AdminSpinWheelController::class, 'updateSettings']);
+        Route::get('/spin-wheel/history',          [\App\Http\Controllers\Admin\AdminSpinWheelController::class, 'history']);
+        Route::get('/spin-wheel/summary',          [\App\Http\Controllers\Admin\AdminSpinWheelController::class, 'summary']);
 
         // Game Management (Admin)
         Route::get('/games',                  [\App\Http\Controllers\Admin\AdminGameController::class, 'index']);
