@@ -12,10 +12,13 @@ class SpinWheelHistory extends Model
     protected $fillable = [
         'user_id', 'prize_id', 'prize_label',
         'prize_type', 'prize_value', 'is_claimed',
+        'spin_type', 'multiplier', 'final_value',
     ];
 
     protected $casts = [
         'prize_value' => 'decimal:2',
+        'multiplier'  => 'decimal:2',
+        'final_value' => 'decimal:2',
         'is_claimed'  => 'boolean',
     ];
 

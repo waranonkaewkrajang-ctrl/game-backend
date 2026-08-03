@@ -78,6 +78,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/spin-wheel',         [\App\Http\Controllers\Api\SpinWheelController::class, 'index']);
     Route::post('/spin-wheel/spin',   [\App\Http\Controllers\Api\SpinWheelController::class, 'spin']);
     Route::get('/spin-wheel/history', [\App\Http\Controllers\Api\SpinWheelController::class, 'history']);
+    Route::get('/spin-wheel/recent-winners', [\App\Http\Controllers\Api\SpinWheelController::class, 'recentWinners']);
 
     // Promotions
     Route::get('/promotions',                        [PromotionController::class, 'index']);
@@ -329,6 +330,11 @@ Route::prefix('admin')->group(function () {
         Route::post('/spin-wheel/settings',        [\App\Http\Controllers\Admin\AdminSpinWheelController::class, 'updateSettings']);
         Route::get('/spin-wheel/history',          [\App\Http\Controllers\Admin\AdminSpinWheelController::class, 'history']);
         Route::get('/spin-wheel/summary',          [\App\Http\Controllers\Admin\AdminSpinWheelController::class, 'summary']);
+        Route::get('/spin-wheel/multipliers',          [\App\Http\Controllers\Admin\AdminSpinWheelController::class, 'multipliers']);
+        Route::post('/spin-wheel/multipliers',         [\App\Http\Controllers\Admin\AdminSpinWheelController::class, 'storeMultiplier']);
+        Route::put('/spin-wheel/multipliers/{id}',     [\App\Http\Controllers\Admin\AdminSpinWheelController::class, 'updateMultiplier']);
+        Route::delete('/spin-wheel/multipliers/{id}',  [\App\Http\Controllers\Admin\AdminSpinWheelController::class, 'destroyMultiplier']);
+        Route::post('/spin-wheel/give-tickets',        [\App\Http\Controllers\Admin\AdminSpinWheelController::class, 'giveTickets']);
 
         // Game Management (Admin)
         Route::get('/games',                  [\App\Http\Controllers\Admin\AdminGameController::class, 'index']);

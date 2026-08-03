@@ -4,11 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class SpinWheelPrize extends Model
+class SpinWheelMultiplier extends Model
 {
     protected $fillable = [
-        'label', 'type', 'value', 'color', 'icon', 'image_url',
-        'probability', 'sort_order', 'is_active',
+        'label', 'value', 'color', 'probability', 'sort_order', 'is_active',
     ];
 
     protected $casts = [
