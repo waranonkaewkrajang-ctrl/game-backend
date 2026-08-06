@@ -52,4 +52,20 @@ class BannerController extends Controller
         }
         return response()->json(['status' => 'error', 'message' => 'ไม่พบแบนเนอร์'], 404);
     }
-}
+
+    public function uploadImage(Request $request)
+    {
+        $request->validate([
+            'image' => 'required|file|mimes:jpg,jpeg,png,webp,gif|max:5120',
+        ]);
+
+        $file = $request->file('image');
+        $filename = 'banner_' . time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+        $file->move(public_path('uploads/banners'), $filename);
+
+        return response()->json([
+            'status' => 'success',
+            'url'    => '/uploads/banners/' . $filename,
+        ]);
+    }
+}  

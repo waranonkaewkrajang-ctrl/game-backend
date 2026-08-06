@@ -221,6 +221,7 @@ Route::prefix('admin')->group(function () {
         Route::get('/banners', [BannerController::class, 'adminIndex']);
         Route::post('/banners', [BannerController::class, 'store']);
         Route::delete('/banners/{id}', [BannerController::class, 'destroy']);
+        Route::post('/banners/upload-image', [BannerController::class, 'uploadImage']);
 
         // เพิ่ม Route สำหรับจัดการแอดมิน
         Route::get('/admins', [AdminUserController::class, 'getAdmins']); // ดูรายชื่อแอดมิน
