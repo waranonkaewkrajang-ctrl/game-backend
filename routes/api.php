@@ -247,6 +247,7 @@ Route::prefix('admin')->group(function () {
 
         // Promotions
         Route::apiResource('/promotions', AdminPromotionController::class);
+        Route::post('/promotions/upload-image', [AdminPromotionController::class, 'uploadImage']);
 
         // Reports
         Route::get('/reports/daily',   [AdminReportController::class, 'daily']);

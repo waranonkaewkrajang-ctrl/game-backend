@@ -65,51 +65,13 @@ class SpinWheelController extends Controller
 
         $wallet = Wallet::where('user_id', $user->id)->lockForUpdate()->first();
 
-        // === ตรวจสอบสิทธิ์ตามประเภท ===
-        if ($spinType === 'free') {
-            if (Setting::getValue('spin_free_enabled', 'true') !== 'true') {
-                return response()->json(['message' => 'ไม่เปิดให้หมุนฟรี'], 422);
-            }
-
-            $dailyLimit = (int) Setting::getValue('spin_wheel_daily_limit', 3);
-            $todayFreeSpins = SpinWheelHistory::where('user_id', $user->id)
-                ->where('spin_type', 'free')
-                ->whereDate('created_at', today())
-                ->count();
-
-            if ($todayFreeSpins >= $dailyLimit) {
-                return response()->json(['message' => "หมุนฟรีได้สูงสุด {$dailyLimit} ครั้ง/วัน"], 422);
-            }
-
-            $condition = Setting::getValue('spin_wheel_condition', 'free_daily');
-            if ($condition === 'deposit_min') {
-                $minDeposit = (float) Setting::getValue('spin_wheel_deposit_min', 100);
-                $todayDeposit = \App\Models\Deposit::where('user_id', $user->id)
-                    ->where('status', 'approved')
-                    ->whereDate('created_at', today())
-                    ->sum('amount');
-                if ($todayDeposit < $minDeposit) {
-                    return response()->json(['message' => "ฝากขั้นต่ำ {$minDeposit} บาท ถึงหมุนฟรีได้"], 422);
-                }
-            }
-
-        } elseif ($spinType === 'ticket') {
-            $ticketCost = (int) Setting::getValue('spin_ticket_cost', 1);
-            if ($wallet->ticket_balance < $ticketCost) {
-                return response()->json(['message' => "ตั๋วไม่พอ (ต้องใช้ {$ticketCost} ใบ)"], 422);
-            }
-            $wallet->decrement('ticket_balance', $ticketCost);
-
-        } elseif ($spinType === 'points') {
-            $pointCost = (float) Setting::getValue('spin_point_cost', 500);
-            if ($wallet->point_balance < $pointCost) {
-                return response()->json(['message' => "คะแนนไม่พอ (ต้องใช้ {$pointCost} คะแนน)"], 422);
-            }
-            $wallet->decrement('point_balance', $pointCost);
-
-        } else {
-            return response()->json(['message' => 'ประเภทการหมุนไม่ถูกต้อง'], 422);
+        // === ตรวจสอบสิทธิ์ — ต้องมีตั๋วเท่านั้น ===
+        $ticketCost = (int) Setting::getValue('spin_ticket_cost', 1);
+        if ($wallet->ticket_balance < $ticketCost) {
+            return response()->json(['message' => "ตั๋วไม่พอ (ต้องใช้ {$ticketCost} ใบ)"], 422);
         }
+        $wallet->decrement('ticket_balance', $ticketCost);
+        $spinType = 'ticket'; // force เป็น ticket เสมอ
 
         // === สุ่มรางวัล ===
         $prizes = SpinWheelPrize::where('is_active', true)->get();

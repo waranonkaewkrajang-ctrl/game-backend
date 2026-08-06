@@ -94,4 +94,20 @@ class AdminPromotionController extends Controller
             'message' => 'ลบโปรโมชันสำเร็จ',
         ]);
     }
-}
+
+    public function uploadImage(Request $request): JsonResponse
+    {
+        $request->validate([
+            'image' => 'required|file|mimes:jpg,jpeg,png,webp,gif|max:5120',
+        ]);
+
+        $file = $request->file('image');
+        $filename = 'promo_' . time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+        $file->move(public_path('uploads/promotions'), $filename);
+
+        return response()->json([
+            'status' => 'success',
+            'url'    => '/uploads/promotions/' . $filename,
+        ]);
+    }
+}  
