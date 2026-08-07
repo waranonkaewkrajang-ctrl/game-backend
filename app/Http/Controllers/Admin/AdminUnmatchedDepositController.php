@@ -73,12 +73,25 @@ class AdminUnmatchedDepositController extends Controller
             return response()->json(['status' => 'error', 'message' => 'ไม่พบสมาชิก "' . $data['username_or_phone'] . '"'], 404);
         }
 
+        // สร้างรายการฝากในระบบ
+        $deposit = \App\Models\Deposit::create([
+            'user_id'      => $user->id,
+            'reference_id' => 'UMD-' . now()->format('Ymd') . '-' . strtoupper(\Illuminate\Support\Str::random(8)),
+            'amount'       => $unmatchedDeposit->amount,
+            'channel'      => 'bank_transfer',
+            'from_bank'    => $unmatchedDeposit->bank,
+            'from_account' => $unmatchedDeposit->from_account,
+            'status'       => 'approved',
+            'approved_by'  => $request->user()->id,
+            'approved_at'  => now(),
+        ]);
+
         // เติมเงินเข้ากระเป๋า
         $this->walletService->deposit(
             $user,
             (float) $unmatchedDeposit->amount,
             'เติมเงินจากยอดค้าง #' . $unmatchedDeposit->id,
-            ['unmatched_deposit_id' => $unmatchedDeposit->id],
+            ['unmatched_deposit_id' => $unmatchedDeposit->id, 'deposit_id' => $deposit->id],
             $request->user()->id
         );
 
