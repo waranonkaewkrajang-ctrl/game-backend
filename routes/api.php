@@ -223,6 +223,12 @@ Route::prefix('admin')->group(function () {
         Route::post('/banners', [BannerController::class, 'store']);
         Route::delete('/banners/{id}', [BannerController::class, 'destroy']);
 
+        // Unmatched Deposits (ยอดค้าง)
+        Route::get('/unmatched-deposits', [\App\Http\Controllers\Admin\AdminUnmatchedDepositController::class, 'index']);
+        Route::post('/unmatched-deposits', [\App\Http\Controllers\Admin\AdminUnmatchedDepositController::class, 'store']);
+        Route::post('/unmatched-deposits/{unmatchedDeposit}/approve', [\App\Http\Controllers\Admin\AdminUnmatchedDepositController::class, 'approve']);
+        Route::post('/unmatched-deposits/{unmatchedDeposit}/reject', [\App\Http\Controllers\Admin\AdminUnmatchedDepositController::class, 'reject']);
+
         // เพิ่ม Route สำหรับจัดการแอดมิน
         Route::get('/admins', [AdminUserController::class, 'getAdmins']); // ดูรายชื่อแอดมิน
         Route::post('/admins', [AdminUserController::class, 'storeAdmin']); // เพิ่มแอดมิน
