@@ -106,15 +106,31 @@ class AdminUserController extends Controller
             return response()->json(['status' => 'error', 'message' => 'ไม่พบ wallet'], 404);
         }
 
+        $before = $wallet->ticket_balance;
         if ($data['amount'] > 0) {
             $wallet->increment('ticket_balance', $data['amount']);
         } else {
-            $newBalance = $wallet->ticket_balance + $data['amount'];
-            if ($newBalance < 0) {
+            if ($before + $data['amount'] < 0) {
                 return response()->json(['status' => 'error', 'message' => 'ตั๋วไม่พอหัก'], 400);
             }
             $wallet->decrement('ticket_balance', abs($data['amount']));
         }
+
+        \DB::table('transactions')->insert([
+            'user_id' => $user->id,
+            'reference_id' => 'TKT-' . date('Ymd') . '-' . strtoupper(substr(uniqid(), -8)),
+            'type' => 'ticket_adjust',
+            'direction' => $data['amount'] > 0 ? 'in' : 'out',
+            'amount' => abs($data['amount']),
+            'balance_before' => $before,
+            'balance_after' => $wallet->fresh()->ticket_balance,
+            'description' => $data['description'] ?? 'ปรับตั๋ววงล้อ',
+            'meta' => json_encode(['adjusted_by' => $request->user()->id]),
+            'status' => 'completed',
+            'processed_by' => $request->user()->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         return response()->json([
             'status'  => 'success',
@@ -135,14 +151,31 @@ class AdminUserController extends Controller
             return response()->json(['status' => 'error', 'message' => 'ไม่พบ wallet'], 404);
         }
 
+        $before = $wallet->point_balance;
         if ($data['amount'] > 0) {
             $wallet->increment('point_balance', $data['amount']);
         } else {
-            if ($wallet->point_balance + $data['amount'] < 0) {
+            if ($before + $data['amount'] < 0) {
                 return response()->json(['status' => 'error', 'message' => 'คะแนนไม่พอหัก'], 400);
             }
             $wallet->decrement('point_balance', abs($data['amount']));
         }
+
+        \DB::table('transactions')->insert([
+            'user_id' => $user->id,
+            'reference_id' => 'PNT-' . date('Ymd') . '-' . strtoupper(substr(uniqid(), -8)),
+            'type' => 'point_adjust',
+            'direction' => $data['amount'] > 0 ? 'in' : 'out',
+            'amount' => abs($data['amount']),
+            'balance_before' => $before,
+            'balance_after' => $wallet->fresh()->point_balance,
+            'description' => $data['description'] ?? 'ปรับคะแนน',
+            'meta' => json_encode(['adjusted_by' => $request->user()->id]),
+            'status' => 'completed',
+            'processed_by' => $request->user()->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         return response()->json([
             'status'  => 'success',
