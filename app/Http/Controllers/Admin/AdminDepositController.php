@@ -18,6 +18,8 @@ class AdminDepositController extends Controller
     {
         $deposits = Deposit::with('user')
             ->when($request->status, fn ($q, $s) => $q->where('status', $s))
+            ->when($request->date_from, fn ($q, $d) => $q->whereDate('created_at', '>=', $d))
+            ->when($request->date_to, fn ($q, $d) => $q->whereDate('created_at', '<=', $d))
             ->when($request->search, function ($q, $search) {
                 $q->whereHas('user', function ($q) use ($search) {
                     $q->where('username', 'like', "%{$search}%")
