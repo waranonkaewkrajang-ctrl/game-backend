@@ -123,6 +123,34 @@ class AdminUserController extends Controller
         ]);
     }
 
+    public function adjustPoints(Request $request, User $user): JsonResponse
+    {
+        $data = $request->validate([
+            'amount'      => 'required|integer|not_in:0',
+            'description' => 'nullable|string|max:255',
+        ]);
+
+        $wallet = $user->wallet;
+        if (!$wallet) {
+            return response()->json(['status' => 'error', 'message' => 'ไม่พบ wallet'], 404);
+        }
+
+        if ($data['amount'] > 0) {
+            $wallet->increment('point_balance', $data['amount']);
+        } else {
+            if ($wallet->point_balance + $data['amount'] < 0) {
+                return response()->json(['status' => 'error', 'message' => 'คะแนนไม่พอหัก'], 400);
+            }
+            $wallet->decrement('point_balance', abs($data['amount']));
+        }
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => "ปรับคะแนนสำเร็จ ({$data['amount']} คะแนน)",
+            'data'    => ['point_balance' => $wallet->fresh()->point_balance],
+        ]);
+    }
+
     // =========================================================
     // แทรกเพิ่มตรงนี้: ส่วนของการจัดการสิทธิ์และพนักงาน (Admins)
     // =========================================================

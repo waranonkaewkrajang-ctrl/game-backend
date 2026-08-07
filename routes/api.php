@@ -240,6 +240,7 @@ Route::prefix('admin')->group(function () {
         Route::put('/users/{user}',         [AdminUserController::class, 'update']);
         Route::post('/users/{user}/adjust', [AdminUserController::class, 'adjustBalance']);
         Route::post('/users/{user}/adjust-tickets', [AdminUserController::class, 'adjustTickets']);
+        Route::post('/users/{user}/adjust-points', [AdminUserController::class, 'adjustPoints']);
 
         // Deposits
         Route::get('/deposits',                    [AdminDepositController::class, 'index']);
