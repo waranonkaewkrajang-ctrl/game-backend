@@ -19,6 +19,7 @@ class WalletController extends Controller
                 'bonus_balance'  => (float) $wallet->bonus_balance,
                 'total_deposit'  => (float) $wallet->total_deposit,
                 'total_withdraw' => (float) $wallet->total_withdraw,
+                'point_balance'  => (float) $wallet->point_balance,
             ],
         ]);
     }
