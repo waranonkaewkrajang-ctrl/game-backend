@@ -42,7 +42,7 @@ class AdminUserController extends Controller
     {
         return response()->json([
             'status' => 'success',
-            'data'   => $user->load(['wallet', 'deposits', 'withdrawals']),
+            'data'   => $user->load(['wallet', 'deposits.approvedBy', 'withdrawals.approver']),
         ]);
     }
 
