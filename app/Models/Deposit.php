@@ -10,7 +10,7 @@ class Deposit extends Model
         'user_id', 'reference_id', 'amount',
         'channel', 'from_bank', 'from_account', 'to_bank', 'to_account',
         'slip_url', 'status', 'reject_reason',
-        'approved_by', 'approved_at', 'promotion_id',
+        'approved_by', 'approved_at', 'promotion_id', 'approved_method',
     ];
 
     protected $casts = [

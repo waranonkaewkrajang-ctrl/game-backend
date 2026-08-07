@@ -37,6 +37,10 @@ class AdminDepositController extends Controller
     {
         try {
             $deposit = $this->depositService->approve($deposit, $request->user()->id);
+            
+            if ($request->input('approved_method') === 'auto') {
+                $deposit->update(['approved_method' => 'auto']);
+            }
 
             app(\App\Services\TelegramService::class)->notifyDeposit($deposit->user->username, $deposit->amount);
 
