@@ -239,6 +239,7 @@ Route::prefix('admin')->group(function () {
         Route::get('/users/{user}',         [AdminUserController::class, 'show']);
         Route::put('/users/{user}',         [AdminUserController::class, 'update']);
         Route::post('/users/{user}/adjust', [AdminUserController::class, 'adjustBalance']);
+        Route::post('/users/{user}/adjust-tickets', [AdminUserController::class, 'adjustTickets']);
 
         // Deposits
         Route::get('/deposits',                    [AdminDepositController::class, 'index']);

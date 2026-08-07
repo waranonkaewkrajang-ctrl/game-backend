@@ -94,6 +94,35 @@ class AdminUserController extends Controller
         }
     }
 
+    public function adjustTickets(Request $request, User $user): JsonResponse
+    {
+        $data = $request->validate([
+            'amount'      => 'required|integer|not_in:0',
+            'description' => 'nullable|string|max:255',
+        ]);
+
+        $wallet = $user->wallet;
+        if (!$wallet) {
+            return response()->json(['status' => 'error', 'message' => 'ไม่พบ wallet'], 404);
+        }
+
+        if ($data['amount'] > 0) {
+            $wallet->increment('ticket_balance', $data['amount']);
+        } else {
+            $newBalance = $wallet->ticket_balance + $data['amount'];
+            if ($newBalance < 0) {
+                return response()->json(['status' => 'error', 'message' => 'ตั๋วไม่พอหัก'], 400);
+            }
+            $wallet->decrement('ticket_balance', abs($data['amount']));
+        }
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => "ปรับตั๋วสำเร็จ ({$data['amount']} ใบ)",
+            'data'    => ['ticket_balance' => $wallet->fresh()->ticket_balance],
+        ]);
+    }
+
     // =========================================================
     // แทรกเพิ่มตรงนี้: ส่วนของการจัดการสิทธิ์และพนักงาน (Admins)
     // =========================================================
