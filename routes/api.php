@@ -242,6 +242,31 @@ Route::prefix('admin')->group(function () {
         Route::post('/users/{user}/adjust-tickets', [AdminUserController::class, 'adjustTickets']);
         Route::post('/users/{user}/adjust-points', [AdminUserController::class, 'adjustPoints']);
 
+        // Transactions
+        Route::get('/transactions', function (\Illuminate\Http\Request $request) {
+            $query = \DB::table('transactions')
+                ->join('users', 'transactions.user_id', '=', 'users.id')
+                ->select('transactions.*', 'users.username', 'users.phone')
+                ->orderBy('transactions.created_at', 'desc');
+            if ($request->filled('type')) {
+                $query->where('transactions.type', $request->type);
+            }
+            if ($request->filled('search')) {
+                $s = $request->search;
+                $query->where(function ($q) use ($s) {
+                    $q->where('users.username', 'like', "%{$s}%")
+                      ->orWhere('users.phone', 'like', "%{$s}%")
+                      ->orWhere('transactions.reference_id', 'like', "%{$s}%");
+                });
+            }
+            return response()->json([
+                'status' => 'success',
+                'data' => $query->paginate(20),
+            ]);
+        });
+
+        // Deposits
+
         // Deposits
         Route::get('/deposits',                    [AdminDepositController::class, 'index']);
         Route::post('/deposits/{deposit}/approve', [AdminDepositController::class, 'approve']);
