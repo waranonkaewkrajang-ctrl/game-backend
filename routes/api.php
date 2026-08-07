@@ -246,7 +246,8 @@ Route::prefix('admin')->group(function () {
         Route::get('/transactions', function (\Illuminate\Http\Request $request) {
             $query = \DB::table('transactions')
                 ->join('users', 'transactions.user_id', '=', 'users.id')
-                ->select('transactions.*', 'users.username', 'users.phone')
+                ->leftJoin('admins', 'transactions.processed_by', '=', 'admins.id')
+                ->select('transactions.*', 'users.username', 'users.phone', 'admins.name as admin_name')
                 ->orderBy('transactions.created_at', 'desc');
             if ($request->filled('type')) {
                 $query->where('transactions.type', $request->type);
