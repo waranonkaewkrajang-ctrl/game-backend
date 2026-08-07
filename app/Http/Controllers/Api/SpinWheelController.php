@@ -134,6 +134,13 @@ class SpinWheelController extends Controller
                 $history->update(['is_claimed' => false]);
                 $message = "ยินดีด้วย! ได้รับ {$prize->label} — แอดมินจะติดต่อกลับ";
                 break;
+            
+            case 'points':
+                $pointsEarned = (int) max(1, $finalValue);
+                $wallet->increment('point_balance', $pointsEarned);
+                $history->update(['is_claimed' => true]);
+                $message = "ได้รับ {$pointsEarned} คะแนน!";
+                break;
 
             case 'nothing':
                 $history->update(['is_claimed' => true]);
