@@ -26,7 +26,7 @@ class AdminPromotionController extends Controller
         $data = $request->validate([
             'title'               => 'required|string|max:255',
             'description'         => 'nullable|string',
-            'image_url'           => 'nullable|url',
+'image_url'           => 'nullable|string',
             'type'                => 'required|in:welcome_bonus,deposit_bonus,cashback,free_credit,referral_bonus',
             'min_deposit'         => 'nullable|numeric|min:0',
             'max_bonus'           => 'nullable|numeric|min:0',
@@ -62,7 +62,7 @@ class AdminPromotionController extends Controller
         $data = $request->validate([
             'title'               => 'nullable|string|max:255',
             'description'         => 'nullable|string',
-            'image_url'           => 'nullable|url',
+'image_url'           => 'nullable|string',
             'type'                => 'nullable|in:welcome_bonus,deposit_bonus,cashback,free_credit,referral_bonus',
             'min_deposit'         => 'nullable|numeric|min:0',
             'max_bonus'           => 'nullable|numeric|min:0',
@@ -107,7 +107,7 @@ class AdminPromotionController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'url'    => '/uploads/promotions/' . $filename,
+            'url'    => url('/uploads/promotions/' . $filename),
         ]);
     }
 }  
