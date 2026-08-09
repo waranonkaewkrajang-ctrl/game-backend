@@ -256,9 +256,11 @@ class AuthController extends Controller
      */
     public function me(Request $request): JsonResponse
     {
+        $user = $request->user()->load('wallet');
+        $user->referral_count = $user->referrals()->count();
         return response()->json([
             'status' => 'success',
-            'data'   => $request->user()->load('wallet'),
+            'data'   => $user,
         ]);
     }
 
