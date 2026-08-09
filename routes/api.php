@@ -172,6 +172,13 @@ Route::middleware('auth:sanctum')->group(function () {
         ]);
     });
 
+
+    Route::get('/contact-links', function () {
+        $line = \App\Models\Setting::where('key', 'line_url')->value('value') ?? '#';
+        $telegram = \App\Models\Setting::where('key', 'telegram_url')->value('value') ?? '#';
+        return response()->json(['line' => $line, 'telegram' => $telegram]);
+    });
+    
     // === Finance Settings (ลูกค้าดึงค่าตั้งการเงิน) ===
     Route::get('/finance/settings', function () {
         $keys = ['min_deposit', 'max_deposit', 'min_withdraw', 'max_withdraw', 'deposit_banks', 'deposit_channels', 'deposit_amounts', 'truewallet_accounts'];
