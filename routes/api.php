@@ -108,7 +108,7 @@ Route::middleware('auth:sanctum')->group(function () {
         }
         return response()->json([
             'status' => 'success',
-            'data'   => $query->orderBy('rank')->limit(24)->get(),
+'data'   => $request->filled('productId') ? $query->orderBy('rank')->get() : $query->orderBy('rank')->limit(24)->get(),
         ]);
     });
 
