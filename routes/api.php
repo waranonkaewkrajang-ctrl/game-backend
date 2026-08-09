@@ -48,6 +48,13 @@ Route::prefix('game/callback')->group(function () {
     Route::post('/settleBets',   [GameController::class, 'win']);
 });
 
+
+Route::get('/contact-links', function () {
+    $line = \App\Models\Setting::where('key', 'line_url')->value('value') ?? '#';
+    $telegram = \App\Models\Setting::where('key', 'telegram_url')->value('value') ?? '#';
+    return response()->json(['line' => $line, 'telegram' => $telegram]);
+});
+
 // =====================================================
 //  USER ROUTES (ต้อง login)
 // =====================================================
@@ -173,11 +180,6 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
 
-    Route::get('/contact-links', function () {
-        $line = \App\Models\Setting::where('key', 'line_url')->value('value') ?? '#';
-        $telegram = \App\Models\Setting::where('key', 'telegram_url')->value('value') ?? '#';
-        return response()->json(['line' => $line, 'telegram' => $telegram]);
-    });
     
     // === Finance Settings (ลูกค้าดึงค่าตั้งการเงิน) ===
     Route::get('/finance/settings', function () {
