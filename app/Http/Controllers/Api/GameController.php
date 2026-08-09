@@ -22,13 +22,14 @@ class GameController extends Controller
     // =====================================================
     public function getProducts(): JsonResponse
     {
-        $result = $this->ambService->getProducts();
-
-        if (($result['code'] ?? 9999) !== 0) {
-            return response()->json(['status' => 'error', 'message' => $result['message'] ?? 'ไม่สามารถดึงข้อมูลได้'], 400);
-        }
-
-        return response()->json(['status' => 'success', 'data' => $result['data']]);
+        // ดึงค่ายจาก DB (เฉพาะที่ active) เรียงตามชื่อ
+        $products = \DB::table('games')
+            ->where('is_active', true)
+            ->distinct()
+            ->orderBy('product_id')
+            ->pluck('product_id')
+            ->toArray();
+        return response()->json(['status' => 'success', 'data' => $products]);
     }
 
     // =====================================================
