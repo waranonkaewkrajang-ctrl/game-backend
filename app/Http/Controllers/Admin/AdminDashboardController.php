@@ -58,11 +58,26 @@ $chartStartDate = $request->filled('from') ? Carbon::parse($request->query('from
                 'status' => 'success',
                 'data'   => [
                     'today' => [
-                        'new_users'       => User::whereBetween('created_at', [$startDate, $endDate])->count(),
-                        'total_deposit'   => Deposit::where('status', 'approved')->whereBetween('approved_at', [$startDate, $endDate])->sum('amount'),
-                        'total_withdraw'  => Withdrawal::where('status', 'approved')->whereBetween('approved_at', [$startDate, $endDate])->sum('amount'),
-                        'total_bet'       => Transaction::where('type', 'bet')->whereBetween('created_at', [$startDate, $endDate])->sum('amount'),
-                        'total_win'       => Transaction::where('type', 'win')->whereBetween('created_at', [$startDate, $endDate])->sum('amount'),
+                        'new_users'           => User::whereBetween('created_at', [$startDate, $endDate])->count(),
+                        'total_deposit'       => Deposit::where('status', 'approved')->whereBetween('approved_at', [$startDate, $endDate])->sum('amount'),
+                        'total_withdraw'      => Withdrawal::where('status', 'approved')->whereBetween('approved_at', [$startDate, $endDate])->sum('amount'),
+                        'total_bet'           => Transaction::where('type', 'bet')->whereBetween('created_at', [$startDate, $endDate])->sum('amount'),
+                        'total_win'           => Transaction::where('type', 'win')->whereBetween('created_at', [$startDate, $endDate])->sum('amount'),
+                        // 🆕 นับจำนวนบิล
+                        'deposit_count'       => Deposit::where('status', 'approved')->whereBetween('approved_at', [$startDate, $endDate])->count(),
+                        'withdraw_count'      => Withdrawal::where('status', 'approved')->whereBetween('approved_at', [$startDate, $endDate])->count(),
+                        // 🆕 First deposit — ผู้ใช้ที่ฝากครั้งแรกในวันนี้
+                        'first_deposit_count' => Deposit::where('status', 'approved')
+                                                    ->whereBetween('approved_at', [$startDate, $endDate])
+                                                    ->whereIn('user_id', function ($query) use ($startDate, $endDate) {
+                                                        $query->select('user_id')
+                                                            ->from('deposits')
+                                                            ->where('status', 'approved')
+                                                            ->groupBy('user_id')
+                                                            ->havingRaw('MIN(approved_at) BETWEEN ? AND ?', [$startDate, $endDate]);
+                                                    })
+                                                    ->distinct('user_id')
+                                                    ->count('user_id'),
                     ],
                     'this_month' => [
                         'new_users'       => User::where('created_at', '>=', $thisMonth)->count(),
