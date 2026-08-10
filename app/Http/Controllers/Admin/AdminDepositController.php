@@ -44,6 +44,9 @@ class AdminDepositController extends Controller
                 $deposit->update(['approved_method' => 'auto']);
             }
 
+            // 🆕 Broadcast event ไปหา user ที่ฝาก → frontend จะเด้ง popup
+            broadcast(new \App\Events\DepositApproved($deposit->fresh()));
+
             app(\App\Services\TelegramService::class)->notifyDeposit($deposit->user->username, $deposit->amount);
 
             return response()->json([
