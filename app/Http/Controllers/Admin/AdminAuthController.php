@@ -189,7 +189,7 @@ class AdminAuthController extends Controller
             'last_login_at' => now(),
         ]);
 
-        $admin->tokens()->delete();
+        $admin->tokens()->where('name', 'admin-token')->delete();
         $token = $admin->createToken('admin-token')->plainTextToken;
 
         return response()->json([
