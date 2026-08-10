@@ -37,7 +37,10 @@ class AdminUnmatchedDepositController extends Controller
             'tx_time'      => 'nullable|string|max:100',
         ]);
 
-        $item = UnmatchedDeposit::create($data);
+        $$item = UnmatchedDeposit::create($data);
+        // ยิง event อัพเดท badge ยอดค้าง
+        $pendingCount = UnmatchedDeposit::where('status', 'pending')->count();
+        event(new \App\Events\AdminBadgeUpdated('unmatched', $pendingCount));
 
         // แจ้ง Telegram
         try {
