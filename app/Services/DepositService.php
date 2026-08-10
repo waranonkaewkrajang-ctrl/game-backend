@@ -73,7 +73,28 @@ class DepositService
             'approved_at' => now(),
         ]);
 
-        return $deposit->fresh();
+        $deposit = $deposit->fresh();
+
+        // 🆕 บันทึก Bank Statement + broadcast (กัน error ไม่ให้กระทบ approve)
+        try {
+            $statement = \App\Models\BankStatement::create([
+                'deposit_id'       => $deposit->id,
+                'user_id'          => $deposit->user_id,
+                'amount'           => $deposit->amount,
+                'bank_code'        => $deposit->to_bank ?? 'SCB',
+                'bank_account'     => $deposit->to_account,
+                'from_name'        => $deposit->from_account,
+                'reference_id'     => $deposit->reference_id,
+                'approved_method'  => $deposit->approved_method ?? 'manual',
+                'approved_by'      => $adminId,
+                'transaction_time' => $deposit->approved_at,
+            ]);
+            broadcast(new \App\Events\BankStatementReceived($statement));
+        } catch (\Exception $e) {
+            \Log::error("BankStatement log failed for deposit #{$deposit->id}: {$e->getMessage()}");
+        }
+
+        return $deposit;
     }
 
     public function reject(Deposit $deposit, int $adminId, string $reason): Deposit

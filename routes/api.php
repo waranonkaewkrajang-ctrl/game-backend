@@ -261,6 +261,10 @@ Route::prefix('admin')->group(function () {
         // Dashboard
         Route::get('/dashboard', [AdminDashboardController::class, 'index']);
 
+        // Bank Statements
+        Route::get('/bank-statements',         [\App\Http\Controllers\Admin\AdminBankStatementController::class, 'index']);
+        Route::get('/bank-statements/summary', [\App\Http\Controllers\Admin\AdminBankStatementController::class, 'summary']);
+
         // 🟢 นำ Route แบนเนอร์มาวางไว้ตรงนี้ครับ 🟢
         Route::get('/banners', [BannerController::class, 'adminIndex']);
         Route::post('/banners/upload-image', [BannerController::class, 'uploadImage']);
