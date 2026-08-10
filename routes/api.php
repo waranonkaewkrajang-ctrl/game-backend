@@ -67,6 +67,36 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/2fa/confirm', [AuthController::class, 'confirmTwoFactor']);
     Route::post('/auth/2fa/disable', [AuthController::class, 'disableTwoFactor']);
 
+    // คำขอเปลี่ยนบัญชีธนาคาร (ลูกค้า)
+    Route::post('/bank-change', function (\Illuminate\Http\Request $request) {
+        $data = $request->validate([
+            'new_bank_code'    => 'required|string|max:20',
+            'new_bank_account' => 'required|string|max:30',
+            'new_bank_name'    => 'required|string|max:100',
+        ]);
+        $user = $request->user();
+        $pending = \App\Models\BankChangeRequest::where('user_id', $user->id)->where('status', 'pending')->exists();
+        if ($pending) {
+            return response()->json(['status' => 'error', 'message' => 'คุณมีคำขอที่รอตรวจสอบอยู่แล้ว'], 400);
+        }
+        \App\Models\BankChangeRequest::create([
+            'user_id'          => $user->id,
+            'old_bank_code'    => $user->bank_code,
+            'old_bank_account' => $user->bank_account,
+            'old_bank_name'    => $user->bank_name,
+            'new_bank_code'    => $data['new_bank_code'],
+            'new_bank_account' => $data['new_bank_account'],
+            'new_bank_name'    => $data['new_bank_name'],
+            'status'           => 'pending',
+        ]);
+        return response()->json(['status' => 'success', 'message' => 'ส่งคำขอเปลี่ยนบัญชีสำเร็จ รอแอดมินตรวจสอบ']);
+    });
+
+    Route::get('/bank-change/status', function (\Illuminate\Http\Request $request) {
+        $req = \App\Models\BankChangeRequest::where('user_id', $request->user()->id)->latest()->first();
+        return response()->json(['status' => 'success', 'data' => $req]);
+    });
+
     // Wallet
     Route::get('/wallet/balance',      [WalletController::class, 'balance']);
     Route::get('/wallet/transactions', [WalletController::class, 'transactions']);
@@ -244,6 +274,49 @@ Route::prefix('admin')->group(function () {
         Route::get('/admins', [AdminUserController::class, 'getAdmins']); // ดูรายชื่อแอดมิน
         Route::post('/admins', [AdminUserController::class, 'storeAdmin']); // เพิ่มแอดมิน
         Route::put('/admins/{id}', [AdminUserController::class, 'updateAdmin']); // แก้ไขแอดมิน
+
+        // คำขอเปลี่ยนบัญชีธนาคาร (แอดมิน)
+        Route::get('/bank-changes', function (\Illuminate\Http\Request $request) {
+            $query = \App\Models\BankChangeRequest::with('user:id,username,full_name,phone')
+                ->orderBy('created_at', 'desc');
+            if ($request->filled('status')) {
+                $query->where('status', $request->status);
+            }
+            return response()->json($query->paginate(20));
+        });
+
+        Route::post('/bank-changes/{id}/approve', function (\Illuminate\Http\Request $request, $id) {
+            $req = \App\Models\BankChangeRequest::findOrFail($id);
+            if ($req->status !== 'pending') {
+                return response()->json(['status' => 'error', 'message' => 'คำขอนี้ถูกดำเนินการแล้ว'], 400);
+            }
+            \App\Models\User::where('id', $req->user_id)->update([
+                'bank_code'    => $req->new_bank_code,
+                'bank_account' => $req->new_bank_account,
+                'bank_name'    => $req->new_bank_name,
+            ]);
+            $req->update([
+                'status'      => 'approved',
+                'reviewed_by' => $request->user()->id,
+                'reviewed_at' => now(),
+                'admin_note'  => $request->input('note'),
+            ]);
+            return response()->json(['status' => 'success', 'message' => 'อนุมัติเปลี่ยนบัญชีสำเร็จ']);
+        });
+
+        Route::post('/bank-changes/{id}/reject', function (\Illuminate\Http\Request $request, $id) {
+            $req = \App\Models\BankChangeRequest::findOrFail($id);
+            if ($req->status !== 'pending') {
+                return response()->json(['status' => 'error', 'message' => 'คำขอนี้ถูกดำเนินการแล้ว'], 400);
+            }
+            $req->update([
+                'status'      => 'rejected',
+                'reviewed_by' => $request->user()->id,
+                'reviewed_at' => now(),
+                'admin_note'  => $request->input('note', 'ข้อมูลไม่ตรงกับที่สมัคร'),
+            ]);
+            return response()->json(['status' => 'success', 'message' => 'ปฏิเสธคำขอแล้ว']);
+        });
 
         // Users
         Route::get('/users',                [AdminUserController::class, 'index']);
