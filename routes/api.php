@@ -329,6 +329,12 @@ Route::prefix('admin')->group(function () {
         Route::post('/users/{user}/adjust-tickets', [AdminUserController::class, 'adjustTickets']);
         Route::post('/users/{user}/adjust-points', [AdminUserController::class, 'adjustPoints']);
 
+        Route::post('/users/{user}/reset-password', function (\Illuminate\Http\Request $request, \App\Models\User $user) {
+            $data = $request->validate(['password' => 'required|string|min:6|max:50']);
+            $user->update(['password' => \Illuminate\Support\Facades\Hash::make($data['password'])]);
+            return response()->json(['status' => 'success', 'message' => 'รีเซ็ตรหัสผ่านสำเร็จ']);
+        });
+
         // Transactions
         Route::get('/transactions', function (\Illuminate\Http\Request $request) {
             $query = \DB::table('transactions')
