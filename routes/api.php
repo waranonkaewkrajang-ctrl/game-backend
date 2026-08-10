@@ -117,7 +117,7 @@ Route::middleware('auth:sanctum')->group(function () {
             'status' => 'success',
 'data'   => $request->filled('productId') 
     ? $query->orderBy('rank')->get() 
-    : $query->orderBy('rank')->get()->unique('product_id')->values(),
+    : $query->orderBy('rank')->get()->unique(function ($g) { return $g->product_id . '|' . $g->category . '|' . $g->type; })->values(),
         ]);
     });
 
