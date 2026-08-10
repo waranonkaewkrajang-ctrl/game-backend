@@ -322,6 +322,7 @@ Route::prefix('admin')->group(function () {
         });
 
         // Users
+        Route::post('/users',               [AdminUserController::class, 'store']); 
         Route::get('/users',                [AdminUserController::class, 'index']);
         Route::get('/users/{user}',         [AdminUserController::class, 'show']);
         Route::put('/users/{user}',         [AdminUserController::class, 'update']);

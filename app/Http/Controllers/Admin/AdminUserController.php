@@ -38,6 +38,67 @@ class AdminUserController extends Controller
         ]);
     }
 
+    // =========================================================
+    // 🆕 สมัครสมาชิกให้ลูกค้า (Admin ตั้งข้อมูลให้)
+    // =========================================================
+    public function store(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'username'      => 'required|string|min:4|max:50|unique:users',
+            'phone'         => 'required|string|min:10|max:20|unique:users',
+            'password'      => 'required|string|min:6|max:50',
+            'full_name'     => 'nullable|string|max:100',
+            'bank_code'     => 'required|string|max:10',
+            'bank_account'  => 'required|string|max:20|unique:users,bank_account',
+            'bank_name'     => 'required|string|max:100',
+            'referral_code' => 'nullable|string|max:20',
+        ], [
+            'username.unique'       => 'ชื่อผู้ใช้นี้ถูกใช้แล้ว',
+            'username.required'     => 'กรุณากรอกชื่อผู้ใช้',
+            'username.min'          => 'ชื่อผู้ใช้ต้องมีอย่างน้อย 4 ตัว',
+            'phone.unique'          => 'เบอร์โทรนี้ถูกใช้แล้ว',
+            'phone.required'        => 'กรุณากรอกเบอร์โทร',
+            'phone.min'             => 'เบอร์โทรไม่ถูกต้อง',
+            'password.required'     => 'กรุณาตั้งรหัสผ่าน',
+            'password.min'          => 'รหัสผ่านอย่างน้อย 6 ตัว',
+            'bank_code.required'    => 'กรุณาเลือกธนาคาร',
+            'bank_account.unique'   => 'เลขบัญชีนี้ถูกใช้แล้ว',
+            'bank_account.required' => 'กรุณากรอกเลขบัญชี',
+            'bank_name.required'    => 'กรุณากรอกชื่อบัญชี',
+        ]);
+
+        $referredBy = null;
+        if (!empty($data['referral_code'])) {
+            $referrer = User::where('referral_code', $data['referral_code'])->first();
+            $referredBy = $referrer?->id;
+        }
+
+        $user = User::create([
+            'username'      => $data['username'],
+            'phone'         => $data['phone'],
+            'password'      => Hash::make($data['password']),
+            'full_name'     => $data['full_name'] ?? null,
+            'bank_code'     => $data['bank_code'],
+            'bank_account'  => $data['bank_account'],
+            'bank_name'     => $data['bank_name'],
+            'referral_code' => strtoupper(\Illuminate\Support\Str::random(8)),
+            'referred_by'   => $referredBy,
+            'status'        => 'active',
+        ]);
+
+        $this->walletService->createWallet($user);
+
+        // Audit log: แอดมินคนไหนสมัครให้
+        $adminId = $request->user()?->id ?? 'unknown';
+        \Log::info("Admin #{$adminId} created user #{$user->id} ({$user->username})");
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'สมัครสมาชิกให้ลูกค้าสำเร็จ',
+            'data'    => $user->load('wallet'),
+        ], 201);
+    }
+
     public function show(User $user): JsonResponse
     {
         return response()->json([
