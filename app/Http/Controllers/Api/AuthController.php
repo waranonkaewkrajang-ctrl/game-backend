@@ -29,9 +29,21 @@ class AuthController extends Controller
             'password'      => 'required|string|min:6|confirmed',
             'full_name'     => 'nullable|string|max:100',
             'bank_code'     => 'required|string|max:10',
-            'bank_account'  => 'required|string|max:20',
+            'bank_account'  => 'required|string|max:20|unique:users,bank_account',
             'bank_name'     => 'required|string|max:100',
             'referral_code' => 'nullable|string|max:20',
+        ], [
+            'username.unique'       => 'ชื่อผู้ใช้นี้ถูกใช้แล้ว',
+            'username.required'     => 'กรุณากรอกชื่อผู้ใช้',
+            'username.min'          => 'ชื่อผู้ใช้ต้องมีอย่างน้อย 4 ตัว',
+            'phone.unique'          => 'เบอร์โทรนี้ถูกใช้แล้ว',
+            'phone.required'        => 'กรุณากรอกเบอร์โทร',
+            'phone.min'             => 'เบอร์โทรไม่ถูกต้อง',
+            'bank_account.unique'   => 'เลขบัญชีนี้ถูกใช้แล้ว',
+            'bank_account.required' => 'กรุณากรอกเลขบัญชี',
+            'password.confirmed'    => 'รหัสผ่านยืนยันไม่ตรงกัน',
+            'password.min'          => 'รหัสผ่านอย่างน้อย 6 ตัว',
+            'bank_name.required'    => 'กรุณากรอกชื่อบัญชี',
         ]);
 
         $referredBy = null;
