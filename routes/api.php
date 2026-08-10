@@ -89,6 +89,9 @@ Route::middleware('auth:sanctum')->group(function () {
             'new_bank_name'    => $data['new_bank_name'],
             'status'           => 'pending',
         ]);
+        // ยิง event real-time ให้แอดมิน
+        $pendingCount = \App\Models\BankChangeRequest::where('status', 'pending')->count();
+        event(new \App\Events\BankChangeRequested($pendingCount));
         return response()->json(['status' => 'success', 'message' => 'ส่งคำขอเปลี่ยนบัญชีสำเร็จ รอแอดมินตรวจสอบ']);
     });
 
