@@ -17,11 +17,11 @@ class AdminDashboardController extends Controller
     {
         try {
             // 1. จัดการวันที่อย่างปลอดภัย
-            $startDate = $request->filled('from') ? Carbon::parse($request->query('from'))->startOfDay() : now()->startOfDay();
-            $endDate = $request->filled('to') ? Carbon::parse($request->query('to'))->endOfDay() : now()->endOfDay();
-            $thisMonth = now()->startOfMonth();
+            $startDate = $request->filled('from') ? Carbon::parse($request->query('from'), 'Asia/Bangkok')->startOfDay()->utc() : Carbon::now('Asia/Bangkok')->startOfDay()->utc();
+            $endDate = $request->filled('to') ? Carbon::parse($request->query('to'), 'Asia/Bangkok')->endOfDay()->utc() : Carbon::now('Asia/Bangkok')->endOfDay()->utc();
+$thisMonth = Carbon::now('Asia/Bangkok')->startOfMonth()->utc();
 
-            $chartStartDate = $request->filled('from') ? Carbon::parse($request->query('from'))->startOfDay() : now()->subDays(6)->startOfDay();
+$chartStartDate = $request->filled('from') ? Carbon::parse($request->query('from'), 'Asia/Bangkok')->startOfDay()->utc() : Carbon::now('Asia/Bangkok')->subDays(6)->startOfDay()->utc();
             $chartEndDate = $endDate->copy();
 
             // 2. ดึงข้อมูล
