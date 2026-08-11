@@ -155,8 +155,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::post('/games/launch',      [GameController::class, 'launchGame']);
-    Route::get('/games/history',      [GameController::class, 'history']);
-    Route::post('/games/launch',      [GameController::class, 'launchGame']);
+    Route::get('/games/recently-played', [GameController::class, 'recentlyPlayed']); 
     Route::get('/games/history',      [GameController::class, 'history']);
     Route::get('/games/product-images', [\App\Http\Controllers\Admin\AdminGameController::class, 'getProductImages']);
 

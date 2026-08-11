@@ -249,6 +249,36 @@ class GameController extends Controller
         return response()->json(['status' => 'success', 'data' => $result['data']]);
     }
 
+/**
+     * 🆕 เกมที่เล่นล่าสุด (distinct — 1 เกม 1 ครั้ง)
+     */
+    public function recentlyPlayed(Request $request): JsonResponse
+    {
+        $userId = $request->user()->id;
+        $limit = (int) $request->query('limit', 12);
+        $limit = max(1, min($limit, 30));
+
+        // Group by provider + game_id → เอาเกมล่าสุดแต่ละอัน
+        $recentGames = \DB::table('game_logs')
+            ->select(
+                'provider',
+                'game_id',
+                \DB::raw('MAX(game_name) as game_name'),
+                \DB::raw('MAX(created_at) as last_played_at')
+            )
+            ->where('user_id', $userId)
+            ->where('action', 'bet')  // เฉพาะรอบที่เล่นจริง (ไม่นับ refund/bonus)
+            ->groupBy('provider', 'game_id')
+            ->orderByDesc('last_played_at')
+            ->limit($limit)
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => $recentGames,
+        ]);
+    }
+
     // =====================================================
     //  ประวัติการเล่นเกม (จาก DB ของเรา)
     // =====================================================
