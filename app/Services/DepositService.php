@@ -51,7 +51,7 @@ class DepositService
         ]);
     }
 
-    public function approve(Deposit $deposit, int $adminId): Deposit
+    public function approve(Deposit $deposit, ?int $adminId): Deposit
     {
         if ($deposit->status !== 'pending') {
             throw new \Exception('รายการนี้ถูกดำเนินการแล้ว');
