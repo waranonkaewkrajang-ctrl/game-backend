@@ -249,33 +249,54 @@ class GameController extends Controller
         return response()->json(['status' => 'success', 'data' => $result['data']]);
     }
 
-/**
-     * 🆕 เกมที่เล่นล่าสุด (distinct — 1 เกม 1 ครั้ง)
-     */
-    public function recentlyPlayed(Request $request): JsonResponse
+public function recentlyPlayed(Request $request): JsonResponse
     {
         $userId = $request->user()->id;
         $limit = (int) $request->query('limit', 12);
         $limit = max(1, min($limit, 30));
 
-        // Group by provider + game_id → เอาเกมล่าสุดแต่ละอัน
-        $recentGames = \DB::table('game_logs')
+        // Step 1: หา distinct games ที่เล่นล่าสุด
+        $recentLogs = \DB::table('game_logs')
             ->select(
                 'provider',
                 'game_id',
-                \DB::raw('MAX(game_name) as game_name'),
                 \DB::raw('MAX(created_at) as last_played_at')
             )
             ->where('user_id', $userId)
-            ->where('action', 'bet')  // เฉพาะรอบที่เล่นจริง (ไม่นับ refund/bonus)
+            ->where('action', 'bet')
             ->groupBy('provider', 'game_id')
             ->orderByDesc('last_played_at')
             ->limit($limit)
             ->get();
 
+        // Step 2: Join กับตาราง games เพื่อเอา game_name, image_url
+        $result = $recentLogs->map(function ($log) {
+            $game = \DB::table('games')
+                ->where('product_id', $log->provider)
+                ->where('game_code', $log->game_id)
+                ->where('is_active', true)
+                ->select('id', 'product_id', 'game_code', 'game_name', 'game_name_th', 'image_url', 'category', 'type')
+                ->first();
+
+            return [
+                'provider'       => $log->provider,
+                'game_id'        => $log->game_id,
+                'last_played_at' => $log->last_played_at,
+                // ข้อมูลเกมจาก join
+                'id'             => $game?->id,
+                'product_id'     => $game?->product_id ?? $log->provider,
+                'game_code'      => $game?->game_code ?? $log->game_id,
+                'game_name'      => $game?->game_name ?? $log->game_id,
+                'game_name_th'   => $game?->game_name_th,
+                'image_url'      => $game?->image_url,
+                'category'       => $game?->category,
+                'type'           => $game?->type,
+            ];
+        })->filter(fn($item) => $item['id'] !== null); // เอาแค่เกมที่มีในระบบ
+
         return response()->json([
             'status' => 'success',
-            'data'   => $recentGames,
+            'data'   => $result->values(),
         ]);
     }
 
