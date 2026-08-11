@@ -77,10 +77,23 @@ class DepositService
 
         // 🆕 บันทึก Bank Statement + broadcast (กัน error ไม่ให้กระทบ approve)
         try {
-            // ดึงข้อมูลบัญชีลูกค้า (ผู้โอน)
+            // ดึงข้อมูลบัญชีลูกค้า (ผู้โอน) จาก User
             $user = $deposit->user;
             $fromName = $user?->bank_name ?? $deposit->from_account ?? null;
             $fromAccount = $user?->bank_account ?? null;
+            $fromBankCode = $user?->bank_code ?? null;
+
+            // ดึงข้อมูลบัญชีของเรา (ผู้รับ) จาก finance settings
+            $bankName = null;
+            try {
+                $settingRaw = \App\Models\Setting::where('key', 'deposit_banks')->value('value');
+                $banks = $settingRaw ? json_decode($settingRaw, true) : [];
+                $matched = collect($banks)->firstWhere('bank_account', $deposit->to_account)
+                        ?? collect($banks)->firstWhere('bank_code', $deposit->to_bank ?? 'SCB');
+                $bankName = $matched['bank_name'] ?? null;
+            } catch (\Exception $e) {
+                // ignore — ไม่มี setting ก็ได้
+            }
 
             $statement = \App\Models\BankStatement::create([
                 'deposit_id'       => $deposit->id,
@@ -88,8 +101,10 @@ class DepositService
                 'amount'           => $deposit->amount,
                 'bank_code'        => $deposit->to_bank ?? 'SCB',
                 'bank_account'     => $deposit->to_account,
+                'bank_name'        => $bankName,
                 'from_name'        => $fromName,
                 'from_account'     => $fromAccount,
+                'from_bank_code'   => $fromBankCode,
                 'reference_id'     => $deposit->reference_id,
                 'approved_method'  => $deposit->approved_method ?? 'manual',
                 'approved_by'      => $adminId,
