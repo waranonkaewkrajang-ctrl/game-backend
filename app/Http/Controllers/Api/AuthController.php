@@ -30,7 +30,13 @@ class AuthController extends Controller
             'full_name'     => 'nullable|string|max:100',
             'bank_code'     => 'required|string|max:10',
             'bank_account'  => 'required|string|max:20|unique:users,bank_account',
-            'bank_name'     => 'required|string|max:100',
+            'bank_name'     => [
+                'required',
+                'string',
+                'max:100',
+                // ต้องมี 2 คำขึ้นไป + แต่ละคำ >= 2 ตัวอักษร + ไทย/อังกฤษเท่านั้น
+                'regex:/^[ก-๙a-zA-Z]{2,}(\s+[ก-๙a-zA-Z]{2,})+$/u',
+            ],
             'referral_code' => 'nullable|string|max:20',
         ], [
             'username.unique'       => 'ชื่อผู้ใช้นี้ถูกใช้แล้ว',
@@ -44,7 +50,32 @@ class AuthController extends Controller
             'password.confirmed'    => 'รหัสผ่านยืนยันไม่ตรงกัน',
             'password.min'          => 'รหัสผ่านอย่างน้อย 6 ตัว',
             'bank_name.required'    => 'กรุณากรอกชื่อบัญชี',
+            'bank_name.regex'       => 'กรุณากรอกชื่อ-นามสกุลจริง (ห้ามตัวเลข/สัญลักษณ์)',
         ]);
+
+        // 🔒 Blacklist ชื่อธนาคาร + คำต้องห้าม
+        $blacklist = [
+            'truewallet', 'truemoney',
+            'scb', 'ไทยพาณิชย์',
+            'kbank', 'กสิกร', 'kasikorn',
+            'ktb', 'กรุงไทย', 'krungthai',
+            'bay', 'กรุงศรี', 'krungsri',
+            'bbl', 'กรุงเทพ', 'bangkokbank',
+            'ttb', 'ทหารไทย', 'tmb',
+            'gsb', 'ออมสิน',
+            'baac', 'ธกส',
+            'ghb', 'cimb',
+            'test', 'admin', 'user', 'demo', 'null',
+        ];
+        
+        $bankNameClean = strtolower(str_replace([' ', '.'], '', $data['bank_name']));
+        foreach ($blacklist as $bad) {
+            if ($bankNameClean === $bad) {
+                throw ValidationException::withMessages([
+                    'bank_name' => 'กรุณากรอกชื่อ-นามสกุลจริง (ห้ามใช้ชื่อธนาคาร)',
+                ]);
+            }
+        }
 
         $referredBy = null;
         if (!empty($data['referral_code'])) {
