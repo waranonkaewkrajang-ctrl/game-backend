@@ -85,12 +85,24 @@ class DepositService
 
             // ดึงข้อมูลบัญชีของเรา (ผู้รับ) จาก finance settings
             $bankName = null;
+            $bankCode = $deposit->to_bank ?? 'SCB';
+            
             try {
-                $settingRaw = \App\Models\Setting::where('key', 'deposit_banks')->value('value');
-                $banks = $settingRaw ? json_decode($settingRaw, true) : [];
-                $matched = collect($banks)->firstWhere('bank_account', $deposit->to_account)
-                        ?? collect($banks)->firstWhere('bank_code', $deposit->to_bank ?? 'SCB');
-                $bankName = $matched['bank_name'] ?? null;
+                // 🎯 TrueWallet → อ่านจาก truewallet_accounts
+                if (strtoupper($bankCode) === 'TRUEWALLET' || strtolower($bankCode) === 'truewallet') {
+                    $twRaw = \App\Models\Setting::where('key', 'truewallet_accounts')->value('value');
+                    $twAccounts = $twRaw ? json_decode($twRaw, true) : [];
+                    $matched = collect($twAccounts)->firstWhere('phone', $deposit->to_account);
+                    $bankName = $matched['name'] ?? 'TrueWallet';
+                    $bankCode = 'TRUEWALLET'; // normalize เป็นตัวใหญ่ทั้งหมด
+                } else {
+                    // 🎯 ธนาคาร → อ่านจาก deposit_banks
+                    $settingRaw = \App\Models\Setting::where('key', 'deposit_banks')->value('value');
+                    $banks = $settingRaw ? json_decode($settingRaw, true) : [];
+                    $matched = collect($banks)->firstWhere('bank_account', $deposit->to_account)
+                            ?? collect($banks)->firstWhere('bank_code', $bankCode);
+                    $bankName = $matched['bank_name'] ?? null;
+                }
             } catch (\Exception $e) {
                 // ignore — ไม่มี setting ก็ได้
             }
@@ -99,7 +111,7 @@ class DepositService
                 'deposit_id'       => $deposit->id,
                 'user_id'          => $deposit->user_id,
                 'amount'           => $deposit->amount,
-                'bank_code'        => $deposit->to_bank ?? 'SCB',
+                'bank_code'        => $bankCode,   // ใช้ตัวแปรที่ normalize แล้ว
                 'bank_account'     => $deposit->to_account,
                 'bank_name'        => $bankName,
                 'from_name'        => $fromName,
