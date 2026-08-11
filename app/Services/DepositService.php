@@ -77,13 +77,19 @@ class DepositService
 
         // 🆕 บันทึก Bank Statement + broadcast (กัน error ไม่ให้กระทบ approve)
         try {
+            // ดึงข้อมูลบัญชีลูกค้า (ผู้โอน)
+            $user = $deposit->user;
+            $fromName = $user?->bank_name ?? $deposit->from_account ?? null;
+            $fromAccount = $user?->bank_account ?? null;
+
             $statement = \App\Models\BankStatement::create([
                 'deposit_id'       => $deposit->id,
                 'user_id'          => $deposit->user_id,
                 'amount'           => $deposit->amount,
                 'bank_code'        => $deposit->to_bank ?? 'SCB',
                 'bank_account'     => $deposit->to_account,
-                'from_name'        => $deposit->from_account,
+                'from_name'        => $fromName,
+                'from_account'     => $fromAccount,
                 'reference_id'     => $deposit->reference_id,
                 'approved_method'  => $deposit->approved_method ?? 'manual',
                 'approved_by'      => $adminId,

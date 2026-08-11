@@ -8,7 +8,7 @@ class BankStatement extends Model
 {
     protected $fillable = [
         'deposit_id', 'user_id', 'amount', 'bank_code', 'bank_account',
-        'from_name', 'reference_id', 'approved_method', 'approved_by',
+        'from_name', 'from_account', 'reference_id', 'approved_method', 'approved_by',
         'transaction_time',
     ];
 
