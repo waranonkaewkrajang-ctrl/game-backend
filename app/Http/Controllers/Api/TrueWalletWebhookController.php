@@ -61,10 +61,55 @@ class TrueWalletWebhookController extends Controller
             return response()->json(['status' => 'duplicate']);
         }
 
-        // หา user จากเบอร์โทร
-        $user = User::where('phone', $phone)
-            ->orWhere('phone', 'LIKE', '%' . substr($phone, -9))
-            ->first();
+        // 🔒 SECURITY: บล็อก DIRECT_TOPUP / ไม่มีเบอร์ / เบอร์สั้นเกิน
+        if ($eventType === 'DIRECT_TOPUP' || empty($phone) || strlen($phone) < 9) {
+            Log::warning('TrueWallet BLOCKED Auto', [
+                'reason' => 'DIRECT_TOPUP or invalid phone',
+                'event_type' => $eventType,
+                'phone' => $phone,
+                'amount' => $amount,
+                'channel' => $data['channel'] ?? '',
+            ]);
+
+            TruewalletTransaction::create([
+                'transaction_id'  => $txnId,
+                'event_type'      => $eventType,
+                'amount'          => $amount,
+                'sender_mobile'   => $phone,
+                'receiver_mobile' => $twNumber,
+                'message'         => $message,
+                'status'          => 'unmatched',
+                'user_id'         => null,
+                'raw_data'        => json_encode($data),
+                'received_at'     => $receivedTime,
+            ]);
+
+            return response()->json([
+                'status' => 'requires_manual',
+                'message' => 'DIRECT_TOPUP - แอดมินต้องตรวจสอบเอง',
+            ]);
+        }
+
+        // 🔒 SECURITY: หา user แบบ exact match เท่านั้น (ห้าม LIKE)
+        $user = User::where('phone', $phone)->first();
+
+        // ถ้าไม่เจอ ลอง match 9 หลักท้าย (แต่ต้องมี result เดียวเท่านั้น!)
+        if (!$user && strlen($phone) >= 9) {
+            $suffix = substr($phone, -9);
+            $matches = User::where('phone', 'LIKE', '%' . $suffix)->get();
+            
+            // 🚨 ถ้าเจอ user หลายคน หรือ suffix สั้นเกิน → ห้าม auto
+            if ($matches->count() === 1) {
+                $user = $matches->first();
+            } else if ($matches->count() > 1) {
+                Log::warning('TrueWallet: multiple users match phone', [
+                    'phone' => $phone,
+                    'match_count' => $matches->count(),
+                    'usernames' => $matches->pluck('username')->toArray(),
+                ]);
+                // ให้ user = null → บันทึก unmatched ด้านล่าง
+            }
+        }
 
         // บันทึกทุกรายการลง truewallet_transactions (เดินบัญชี)
         $twTx = TruewalletTransaction::create([
