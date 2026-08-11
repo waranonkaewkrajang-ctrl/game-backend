@@ -90,28 +90,86 @@ class TrueWalletWebhookController extends Controller
             ]);
         }
 
-        // 🔒 SECURITY: หา user แบบ exact match เท่านั้น (ห้าม LIKE)
-        $user = User::where('phone', $phone)->first();
+        // 🔒 SECURITY: ต้อง match 3 เงื่อนไข
+        // 1. phone มีความยาว 10 หลัก
+        // 2. bank_code = TRUEWALLET
+        // 3. bank_account = เบอร์ที่โอนมา (เป๊ะ)
+        
+        if (strlen($phone) !== 10) {
+            Log::warning('TrueWallet BLOCKED: phone ไม่ครบ 10 หลัก', [
+                'phone' => $phone,
+                'amount' => $amount,
+            ]);
 
-        // ถ้าไม่เจอ ลอง match 9 หลักท้าย (แต่ต้องมี result เดียวเท่านั้น!)
-        if (!$user && strlen($phone) >= 9) {
-            $suffix = substr($phone, -9);
-            $matches = User::where('phone', 'LIKE', '%' . $suffix)->get();
-            
-            // 🚨 ถ้าเจอ user หลายคน หรือ suffix สั้นเกิน → ห้าม auto
-            if ($matches->count() === 1) {
-                $user = $matches->first();
-            } else if ($matches->count() > 1) {
-                Log::warning('TrueWallet: multiple users match phone', [
-                    'phone' => $phone,
-                    'match_count' => $matches->count(),
-                    'usernames' => $matches->pluck('username')->toArray(),
-                ]);
-                // ให้ user = null → บันทึก unmatched ด้านล่าง
-            }
+            TruewalletTransaction::create([
+                'transaction_id'  => $txnId,
+                'event_type'      => $eventType,
+                'amount'          => $amount,
+                'sender_mobile'   => $phone,
+                'receiver_mobile' => $twNumber,
+                'message'         => $message,
+                'status'          => 'unmatched',
+                'user_id'         => null,
+                'raw_data'        => json_encode($data),
+                'received_at'     => $receivedTime,
+            ]);
+
+            return response()->json(['status' => 'invalid_phone']);
         }
 
-        // บันทึกทุกรายการลง truewallet_transactions (เดินบัญชี)
+        // 🔒 หา user ที่มี bank_code = TRUEWALLET + bank_account = เบอร์เป๊ะ
+        $matches = User::where('bank_code', 'TRUEWALLET')
+            ->where('bank_account', $phone)
+            ->get();
+
+        if ($matches->count() === 0) {
+            Log::warning('TrueWallet BLOCKED: ไม่พบ user สมัคร TrueWallet เบอร์นี้', [
+                'phone' => $phone,
+                'amount' => $amount,
+            ]);
+
+            TruewalletTransaction::create([
+                'transaction_id'  => $txnId,
+                'event_type'      => $eventType,
+                'amount'          => $amount,
+                'sender_mobile'   => $phone,
+                'receiver_mobile' => $twNumber,
+                'message'         => $message,
+                'status'          => 'unmatched',
+                'user_id'         => null,
+                'raw_data'        => json_encode($data),
+                'received_at'     => $receivedTime,
+            ]);
+
+            return response()->json(['status' => 'user_not_found']);
+        }
+
+        if ($matches->count() > 1) {
+            Log::error('TrueWallet BLOCKED: พบ user หลายคนใช้เบอร์เดียวกัน!', [
+                'phone' => $phone,
+                'amount' => $amount,
+                'usernames' => $matches->pluck('username')->toArray(),
+            ]);
+
+            TruewalletTransaction::create([
+                'transaction_id'  => $txnId,
+                'event_type'      => $eventType,
+                'amount'          => $amount,
+                'sender_mobile'   => $phone,
+                'receiver_mobile' => $twNumber,
+                'message'         => $message,
+                'status'          => 'unmatched',
+                'user_id'         => null,
+                'raw_data'        => json_encode($data),
+                'received_at'     => $receivedTime,
+            ]);
+
+            return response()->json(['status' => 'multiple_users']);
+        }
+
+        $user = $matches->first();
+
+        // ✅ เจอ user แล้ว → สร้าง TruewalletTransaction record
         $twTx = TruewalletTransaction::create([
             'transaction_id'  => $txnId,
             'event_type'      => $eventType,
@@ -119,17 +177,11 @@ class TrueWalletWebhookController extends Controller
             'sender_mobile'   => $phone,
             'receiver_mobile' => $twNumber,
             'message'         => $message,
-            'status'          => $user ? 'matched' : 'unmatched',
-            'user_id'         => $user?->id,
+            'status'          => 'matched',
+            'user_id'         => $user->id,
             'raw_data'        => json_encode($data),
             'received_at'     => $receivedTime,
         ]);
-
-        // ไม่เจอ user → บันทึกไว้แต่ไม่ฝาก
-        if (!$user) {
-            Log::warning('TrueWallet: ไม่พบ user เบอร์ ' . $phone, ['amount' => $amount]);
-            return response()->json(['status' => 'user_not_found']);
-        }
 
         // เช็ค deposit ซ้ำ
         if (Deposit::where('reference_id', $refId)->exists()) {
