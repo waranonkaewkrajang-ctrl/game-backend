@@ -191,19 +191,20 @@ class TrueWalletWebhookController extends Controller
 
         // สร้าง deposit + auto approve
         $deposit = Deposit::create([
-            'user_id'      => $user->id,
-            'reference_id' => $refId,
-            'amount'       => $amount,
-            'channel'      => 'truewallet',
-            'from_bank'    => 'truewallet',
-            'from_account' => $phone,
-            'to_bank'      => 'truewallet',
-            'to_account'   => $twNumber,
-            'status'       => 'pending',
+            'user_id'         => $user->id,
+            'reference_id'    => $refId,
+            'amount'          => $amount,
+            'channel'         => 'truewallet',
+            'from_bank'       => 'truewallet',
+            'from_account'    => $phone,
+            'to_bank'         => 'truewallet',
+            'to_account'      => $twNumber,
+            'status'          => 'pending',
+            'approved_method' => 'auto',    // 🆕 mark as AUTO
         ]);
 
         try {
-            $depositService->approve($deposit, 1);
+            $depositService->approve($deposit, null);   // 🆕 approved_by = null (ระบบทำเอง)
             $twTx->update(['deposit_id' => $deposit->id]);
 
             Log::info('TrueWallet Auto OK', [
