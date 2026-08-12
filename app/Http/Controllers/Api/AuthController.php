@@ -24,7 +24,7 @@ class AuthController extends Controller
     public function register(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'username'      => 'required|string|min:4|max:50|unique:users',
+            'username'      => 'required|string|min:4|max:50|unique:users|regex:/^[a-zA-Z0-9_]+$/',
             'phone'         => 'required|string|min:10|max:20|unique:users',
             'password'      => 'required|string|min:6|confirmed',
             'full_name'     => 'nullable|string|max:100',
@@ -42,6 +42,7 @@ class AuthController extends Controller
             'username.unique'       => 'ชื่อผู้ใช้นี้ถูกใช้แล้ว',
             'username.required'     => 'กรุณากรอกชื่อผู้ใช้',
             'username.min'          => 'ชื่อผู้ใช้ต้องมีอย่างน้อย 4 ตัว',
+            'username.regex'        => 'ชื่อผู้ใช้ต้องเป็นภาษาอังกฤษและตัวเลขเท่านั้น (a-z, A-Z, 0-9, _)',
             'phone.unique'          => 'เบอร์โทรนี้ถูกใช้แล้ว',
             'phone.required'        => 'กรุณากรอกเบอร์โทร',
             'phone.min'             => 'เบอร์โทรไม่ถูกต้อง',
