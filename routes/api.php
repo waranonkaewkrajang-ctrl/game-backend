@@ -63,18 +63,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // Auth & 2FA
     Route::post('/auth/logout',      [AuthController::class, 'logout']);
     Route::get('/auth/me',           [AuthController::class, 'me']);
-    
-    // 🟢 Ping — track online status (ทุก 1 นาทีจาก frontend)
-    Route::post('/ping', function (\Illuminate\Http\Request $request) {
-        $user = $request->user();
-        if ($user) {
-            $user->last_activity_at = now();
-            $user->saveQuietly();
-        }
-        return response()->json(['ok' => true]);
-    });
-    
-    Route::post('/auth/2fa/enable',  [AuthController::class, 'enableTwoFactor']);
     Route::post('/auth/2fa/enable',  [AuthController::class, 'enableTwoFactor']);
     Route::post('/auth/2fa/confirm', [AuthController::class, 'confirmTwoFactor']);
     Route::post('/auth/2fa/disable', [AuthController::class, 'disableTwoFactor']);
