@@ -30,7 +30,7 @@ class AdminUserController extends Controller
             })
             ->when($request->status, fn ($q, $s) => $q->where('status', $s))
             ->orderBy('created_at', 'desc')
-            ->paginate(20);
+            ->paginate($request->input('per_page', 20));
 
         return response()->json([
             'status' => 'success',
