@@ -24,34 +24,46 @@ $thisMonth = Carbon::now('Asia/Bangkok')->startOfMonth()->utc();
 $chartStartDate = $request->filled('from') ? Carbon::parse($request->query('from'), 'Asia/Bangkok')->startOfDay()->utc() : Carbon::now('Asia/Bangkok')->subDays(6)->startOfDay()->utc();
             $chartEndDate = $endDate->copy();
 
-            // 2. ดึงข้อมูล
-            $deposits = Deposit::where('status', 'approved')->whereBetween('approved_at', [$chartStartDate, $chartEndDate])->get();
-            $withdrawals = Withdrawal::where('status', 'approved')->whereBetween('approved_at', [$chartStartDate, $chartEndDate])->get();
-            $transactions = Transaction::whereIn('type', ['bet', 'win'])->whereBetween('created_at', [$chartStartDate, $chartEndDate])->get();
+            // 2. ดึงข้อมูลแบบ SQL Group By (CONVERT_TZ — แม่นยำ ไม่ขึ้นกับ PHP timezone)
+            $depositRows = \DB::table('deposits')
+                ->selectRaw("DATE(CONVERT_TZ(approved_at,'+00:00','+07:00')) as d, SUM(amount) as total")
+                ->where('status', 'approved')
+                ->whereBetween('approved_at', [$chartStartDate, $chartEndDate])
+                ->groupBy('d')->pluck('total', 'd');
 
-            // 3. จัดกลุ่มข้อมูลแบบปลอดภัย ป้องกัน Error format() on null/string
+            $withdrawRows = \DB::table('withdrawals')
+                ->selectRaw("DATE(CONVERT_TZ(approved_at,'+00:00','+07:00')) as d, SUM(amount) as total")
+                ->where('status', 'approved')
+                ->whereBetween('approved_at', [$chartStartDate, $chartEndDate])
+                ->groupBy('d')->pluck('total', 'd');
+
+            $betRows = \DB::table('transactions')
+                ->selectRaw("DATE(CONVERT_TZ(created_at,'+00:00','+07:00')) as d, SUM(amount) as total")
+                ->where('type', 'bet')
+                ->whereBetween('created_at', [$chartStartDate, $chartEndDate])
+                ->groupBy('d')->pluck('total', 'd');
+
+            $winRows = \DB::table('transactions')
+                ->selectRaw("DATE(CONVERT_TZ(created_at,'+00:00','+07:00')) as d, SUM(amount) as total")
+                ->where('type', 'win')
+                ->whereBetween('created_at', [$chartStartDate, $chartEndDate])
+                ->groupBy('d')->pluck('total', 'd');
+
+            // 3. สร้าง chart data ตามวัน (Bangkok)
             $chartData = [];
-            for ($date = $chartStartDate->copy(); $date->lte($chartEndDate); $date->addDay()) {
-                $dateString = $date->copy()->setTimezone('Asia/Bangkok')->format('Y-m-d');
-                
+            $cursor = $chartStartDate->copy()->setTimezone('Asia/Bangkok')->startOfDay();
+            $chartEndBkk = $chartEndDate->copy()->setTimezone('Asia/Bangkok')->endOfDay();
+
+            while ($cursor->lte($chartEndBkk)) {
+                $key = $cursor->format('Y-m-d');
                 $chartData[] = [
-                    'name' => $date->copy()->setTimezone('Asia/Bangkok')->format('d/m'),
-                    'deposit' => (float) $deposits->filter(function($d) use ($dateString) {
-                        return $d->approved_at && Carbon::parse($d->approved_at)->setTimezone('Asia/Bangkok')->format('Y-m-d') === $dateString;
-                    })->sum('amount'),
-                    
-                    'withdraw' => (float) $withdrawals->filter(function($w) use ($dateString) {
-                        return $w->approved_at && Carbon::parse($w->approved_at)->setTimezone('Asia/Bangkok')->format('Y-m-d') === $dateString;
-                    })->sum('amount'),
-                    
-                    'bet' => (float) $transactions->filter(function($t) use ($dateString) {
-                        return $t->created_at && Carbon::parse($t->created_at)->setTimezone('Asia/Bangkok')->format('Y-m-d') === $dateString && $t->type === 'bet';
-                    })->sum('amount'),
-                    
-                    'win' => (float) $transactions->filter(function($t) use ($dateString) {
-                        return $t->created_at && Carbon::parse($t->created_at)->setTimezone('Asia/Bangkok')->format('Y-m-d') === $dateString && $t->type === 'win';
-                    })->sum('amount'),
+                    'name'     => $cursor->format('d/m'),
+                    'deposit'  => (float) ($depositRows[$key]  ?? 0),
+                    'withdraw' => (float) ($withdrawRows[$key] ?? 0),
+                    'bet'      => (float) ($betRows[$key]      ?? 0),
+                    'win'      => (float) ($winRows[$key]      ?? 0),
                 ];
+                $cursor->addDay();
             }
 
             return response()->json([
