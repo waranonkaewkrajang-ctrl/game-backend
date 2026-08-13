@@ -86,6 +86,65 @@ class AdminReportController extends Controller
 
         $profit = bcsub(bcsub($totalBet, $totalWin, 2), $totalBonus, 2);
 
+        // 🆕 Daily breakdown (SQL CONVERT_TZ — แม่นยำ ไม่ขึ้นกับ PHP timezone)
+        $depRows = \DB::table('deposits')
+            ->selectRaw("DATE(CONVERT_TZ(approved_at,'+00:00','+07:00')) as d, SUM(amount) as total, COUNT(*) as cnt")
+            ->where('status', 'approved')
+            ->whereBetween('approved_at', [$start, $end])
+            ->groupBy('d')->get()->keyBy('d');
+
+        $wdRows = \DB::table('withdrawals')
+            ->selectRaw("DATE(CONVERT_TZ(approved_at,'+00:00','+07:00')) as d, SUM(amount) as total, COUNT(*) as cnt")
+            ->where('status', 'approved')
+            ->whereBetween('approved_at', [$start, $end])
+            ->groupBy('d')->get()->keyBy('d');
+
+        $betRows = \DB::table('transactions')
+            ->selectRaw("DATE(CONVERT_TZ(created_at,'+00:00','+07:00')) as d, SUM(amount) as total")
+            ->where('type', 'bet')
+            ->whereBetween('created_at', [$start, $end])
+            ->groupBy('d')->pluck('total', 'd');
+
+        $winRows = \DB::table('transactions')
+            ->selectRaw("DATE(CONVERT_TZ(created_at,'+00:00','+07:00')) as d, SUM(amount) as total")
+            ->where('type', 'win')
+            ->whereBetween('created_at', [$start, $end])
+            ->groupBy('d')->pluck('total', 'd');
+
+        $newUserRows = \DB::table('users')
+            ->selectRaw("DATE(CONVERT_TZ(created_at,'+00:00','+07:00')) as d, COUNT(*) as cnt")
+            ->whereBetween('created_at', [$start, $end])
+            ->groupBy('d')->pluck('cnt', 'd');
+
+        $daily = [];
+        $cursor = \Carbon\Carbon::parse($from, 'Asia/Bangkok')->startOfDay();
+        $stop   = \Carbon\Carbon::parse($to, 'Asia/Bangkok')->startOfDay();
+
+        while ($cursor->lte($stop)) {
+            $k = $cursor->format('Y-m-d');
+            $dep = (float) ($depRows[$k]->total ?? 0);
+            $wd  = (float) ($wdRows[$k]->total ?? 0);
+            $bet = (float) ($betRows[$k] ?? 0);
+            $win = (float) ($winRows[$k] ?? 0);
+
+            $daily[] = [
+                'date'           => $k,
+                'date_label'     => $cursor->format('d/m/Y'),
+                'total_deposit'  => $dep,
+                'total_withdraw' => $wd,
+                'deposit_count'  => (int) ($depRows[$k]->cnt ?? 0),
+                'withdraw_count' => (int) ($wdRows[$k]->cnt ?? 0),
+                'total_bet'      => $bet,
+                'total_win'      => $win,
+                'new_users'      => (int) ($newUserRows[$k] ?? 0),
+                'net_cash'       => round($dep - $wd, 2),
+                'game_profit'    => round($bet - $win, 2),
+            ];
+            $cursor->addDay();
+        }
+        // เรียงวันล่าสุดขึ้นก่อน
+        $daily = array_reverse($daily);
+
         return response()->json([
             'status' => 'success',
             'data'   => [
@@ -97,6 +156,7 @@ class AdminReportController extends Controller
                 'total_win'       => (float) $totalWin,
                 'total_bonus'     => (float) $totalBonus,
                 'profit'          => (float) $profit,
+                'daily'           => $daily,
             ],
         ]);
     }
