@@ -32,24 +32,24 @@ $chartStartDate = $request->filled('from') ? Carbon::parse($request->query('from
             // 3. จัดกลุ่มข้อมูลแบบปลอดภัย ป้องกัน Error format() on null/string
             $chartData = [];
             for ($date = $chartStartDate->copy(); $date->lte($chartEndDate); $date->addDay()) {
-                $dateString = $date->format('Y-m-d');
+                $dateString = $date->copy()->setTimezone('Asia/Bangkok')->format('Y-m-d');
                 
                 $chartData[] = [
-                    'name' => $date->format('d/m'),
+                    'name' => $date->copy()->setTimezone('Asia/Bangkok')->format('d/m'),
                     'deposit' => (float) $deposits->filter(function($d) use ($dateString) {
-                        return $d->approved_at && Carbon::parse($d->approved_at)->format('Y-m-d') === $dateString;
+                        return $d->approved_at && Carbon::parse($d->approved_at)->setTimezone('Asia/Bangkok')->format('Y-m-d') === $dateString;
                     })->sum('amount'),
                     
                     'withdraw' => (float) $withdrawals->filter(function($w) use ($dateString) {
-                        return $w->approved_at && Carbon::parse($w->approved_at)->format('Y-m-d') === $dateString;
+                        return $w->approved_at && Carbon::parse($w->approved_at)->setTimezone('Asia/Bangkok')->format('Y-m-d') === $dateString;
                     })->sum('amount'),
                     
                     'bet' => (float) $transactions->filter(function($t) use ($dateString) {
-                        return $t->created_at && Carbon::parse($t->created_at)->format('Y-m-d') === $dateString && $t->type === 'bet';
+                        return $t->created_at && Carbon::parse($t->created_at)->setTimezone('Asia/Bangkok')->format('Y-m-d') === $dateString && $t->type === 'bet';
                     })->sum('amount'),
                     
                     'win' => (float) $transactions->filter(function($t) use ($dateString) {
-                        return $t->created_at && Carbon::parse($t->created_at)->format('Y-m-d') === $dateString && $t->type === 'win';
+                        return $t->created_at && Carbon::parse($t->created_at)->setTimezone('Asia/Bangkok')->format('Y-m-d') === $dateString && $t->type === 'win';
                     })->sum('amount'),
                 ];
             }
