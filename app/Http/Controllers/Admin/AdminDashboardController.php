@@ -88,7 +88,7 @@ $chartStartDate = $request->filled('from') ? Carbon::parse($request->query('from
                     ],
                     'overall' => [
                         'total_users'     => User::count(),
-                        'active_users'    => User::where('status', 'active')->count(),
+                        'active_users'    => User::whereBetween('last_login_at', [$startDate, $endDate])->count(),
                         'total_balance'   => \App\Models\Wallet::sum('balance'),
                     ],
                     'pending' => [
