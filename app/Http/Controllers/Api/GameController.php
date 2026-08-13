@@ -8,6 +8,7 @@ use App\Services\GameCallbackService;
 use App\Services\WalletService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class GameController extends Controller
 {
@@ -57,6 +58,15 @@ class GameController extends Controller
 
         $user = $request->user();
 
+        if (!$user) {
+            return response()->json(['status' => 'error', 'message' => 'กรุณาเข้าสู่ระบบก่อนเข้าเล่นเกม'], 401);
+        }
+
+        if (!$user->username) {
+            Log::warning('launchGame: user has no username', ['user_id' => $user->id]);
+            return response()->json(['status' => 'error', 'message' => 'บัญชียังไม่พร้อมใช้งาน'], 400);
+        }
+
         if (!$user->isActive()) {
             return response()->json(['status' => 'error', 'message' => 'บัญชีถูกระงับ'], 403);
         }
@@ -75,14 +85,27 @@ class GameController extends Controller
         $callbackUrl = (string) ($request->input('callbackUrl') ?? config('app.url', ''));
         $sessionToken = substr(md5(uniqid(mt_rand(), true)), 0, 20);
 
-        $result = $this->ambService->login(
-            $ambUsername,
-            (string) $data['productId'],
-            (string) $data['gameCode'],
-            $isMobile,
-            $sessionToken,
-            $callbackUrl
-        );
+        try {
+            $result = $this->ambService->login(
+                $ambUsername,
+                (string) $data['productId'],
+                (string) $data['gameCode'],
+                $isMobile,
+                $sessionToken,
+                $callbackUrl
+            );
+        } catch (\Throwable $e) {
+            Log::error('launchGame provider failed', [
+                'user'      => $user->username,
+                'productId' => $data['productId'],
+                'gameCode'  => $data['gameCode'],
+                'error'     => $e->getMessage(),
+            ]);
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'เกมไม่พร้อมให้บริการในขณะนี้ กรุณาลองใหม่ภายหลัง'
+            ], 503);
+        }
 
         if (($result['code'] ?? 9999) !== 0) {
             $msg = $result['message'] ?? 'Unknown error';
@@ -108,8 +131,23 @@ class GameController extends Controller
     // =====================================================
     public function getBalance(Request $request): JsonResponse
     {
-        $result = $this->callbackService->getBalance($request->input('username'));
-
+        $username = $request->input('username');
+        
+        // 🔒 Validate username
+        if (empty($username) || !is_string($username)) {
+            \Log::warning('Callback getBalance: username missing', $request->all());
+            return response()->json([
+                'id'              => $request->input('id', uniqid()),
+                'statusCode'      => 10002,  // Invalid parameter
+                'timestampMillis' => (int) round(microtime(true) * 1000),
+                'productId'       => $request->input('productId', ''),
+                'currency'        => $request->input('currency', 'THB'),
+                'balance'         => 0,
+                'message'         => 'username is required',
+            ]);
+        }
+        
+        $result = $this->callbackService->getBalance($username);
         $statusCode = ($result['status'] === 'success') ? 0 : 10001;
 
         return response()->json([
@@ -126,6 +164,22 @@ class GameController extends Controller
     public function bet(Request $request): JsonResponse
     {
         $username = $request->input('username');
+
+        // 🔒 Validate username
+        if (empty($username) || !is_string($username)) {
+            Log::warning('Callback bet: username missing', $request->all());
+            return response()->json([
+                'id'              => $request->input('id', uniqid()),
+                'statusCode'      => 10002,
+                'timestampMillis' => (int) round(microtime(true) * 1000),
+                'productId'       => $request->input('productId', ''),
+                'currency'        => $request->input('currency', 'THB'),
+                'balanceBefore'   => 0,
+                'balanceAfter'    => 0,
+                'username'        => '',
+            ]);
+        }
+
         $txns = $request->input('txns', []);
         $txn = $txns[0] ?? [];
 
@@ -160,6 +214,22 @@ class GameController extends Controller
     public function win(Request $request): JsonResponse
     {
         $username = $request->input('username');
+
+        // 🔒 Validate username
+        if (empty($username) || !is_string($username)) {
+            Log::warning('Callback win: username missing', $request->all());
+            return response()->json([
+                'id'              => $request->input('id', uniqid()),
+                'statusCode'      => 10002,
+                'timestampMillis' => (int) round(microtime(true) * 1000),
+                'productId'       => $request->input('productId', ''),
+                'currency'        => $request->input('currency', 'THB'),
+                'balanceBefore'   => 0,
+                'balanceAfter'    => 0,
+                'username'        => '',
+            ]);
+        }
+
         $txns = $request->input('txns', []);
         $txn = $txns[0] ?? [];
 
@@ -305,8 +375,13 @@ public function recentlyPlayed(Request $request): JsonResponse
     // =====================================================
     public function history(Request $request): JsonResponse
     {
-        $logs = $request->user()
-            ->gameLogs()
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json(['status' => 'error', 'message' => 'กรุณาเข้าสู่ระบบ'], 401);
+        }
+
+        $logs = $user->gameLogs()
             ->orderBy('created_at', 'desc')
             ->paginate(20);
 
