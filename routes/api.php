@@ -260,6 +260,10 @@ Route::prefix('admin')->group(function () {
         // Dashboard
         Route::get('/dashboard', [AdminDashboardController::class, 'index']);
 
+        // Marketing (การตลาด)
+        Route::get('/marketing/users',  [\App\Http\Controllers\Admin\AdminMarketingController::class, 'users']);
+        Route::get('/marketing/export', [\App\Http\Controllers\Admin\AdminMarketingController::class, 'export']);
+
         // Bank Statements
         Route::get('/bank-statements',         [\App\Http\Controllers\Admin\AdminBankStatementController::class, 'index']);
         Route::get('/bank-statements/summary', [\App\Http\Controllers\Admin\AdminBankStatementController::class, 'summary']);
