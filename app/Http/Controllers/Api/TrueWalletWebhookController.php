@@ -84,6 +84,8 @@ class TrueWalletWebhookController extends Controller
                 'received_at'     => $receivedTime,
             ]);
 
+            $this->saveToUnmatched($data, $amount, $phone, 'DIRECT_TOPUP / เบอร์ไม่ถูกต้อง');
+
             return response()->json([
                 'status' => 'requires_manual',
                 'message' => 'DIRECT_TOPUP - แอดมินต้องตรวจสอบเอง',
@@ -114,6 +116,8 @@ class TrueWalletWebhookController extends Controller
                 'received_at'     => $receivedTime,
             ]);
 
+            $this->saveToUnmatched($data, $amount, $phone, 'เบอร์ไม่ครบ 10 หลัก');
+
             return response()->json(['status' => 'invalid_phone']);
         }
 
@@ -141,6 +145,8 @@ class TrueWalletWebhookController extends Controller
                 'received_at'     => $receivedTime,
             ]);
 
+            $this->saveToUnmatched($data, $amount, $phone, 'ไม่พบ user ที่สมัคร TrueWallet เบอร์นี้');
+
             return response()->json(['status' => 'user_not_found']);
         }
 
@@ -163,6 +169,8 @@ class TrueWalletWebhookController extends Controller
                 'raw_data'        => json_encode($data),
                 'received_at'     => $receivedTime,
             ]);
+
+            $this->saveToUnmatched($data, $amount, $phone, 'พบ user หลายคนใช้เบอร์เดียวกัน');
 
             return response()->json(['status' => 'multiple_users']);
         }
@@ -227,5 +235,31 @@ class TrueWalletWebhookController extends Controller
             $phone = '0' . substr($phone, 2);
         }
         return $phone;
+    }
+
+    /**
+     * 🆕 บันทึกเข้า unmatched_deposits ให้ Admin เห็นในหน้าเดียวกับธนาคาร
+     */
+    private function saveToUnmatched(array $data, float $amount, string $phone, string $reason): void
+    {
+        try {
+            \Illuminate\Support\Facades\DB::table('unmatched_deposits')->insert([
+                'bank'         => 'TRUEWALLET',
+                'amount'       => $amount,
+                'from_account' => trim(($data['sender_name'] ?? 'ไม่ทราบชื่อ') . ' ' . $phone),
+                'tx_time'      => now('Asia/Bangkok')->format('d/m/Y H:i'),
+                'status'       => 'pending',
+                'note'         => $reason,
+                'created_at'   => now(),
+                'updated_at'   => now(),
+            ]);
+            Log::info('TrueWallet → unmatched_deposits', [
+                'phone'  => $phone,
+                'amount' => $amount,
+                'reason' => $reason,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('TrueWallet saveToUnmatched failed', ['error' => $e->getMessage()]);
+        }
     }
 }
