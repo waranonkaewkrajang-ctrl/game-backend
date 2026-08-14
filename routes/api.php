@@ -363,7 +363,7 @@ Route::prefix('admin')->group(function () {
             }
             return response()->json([
                 'status' => 'success',
-                'data' => $query->paginate(20),
+                'data' => $query->paginate(min((int) $request->input('per_page', 20), 1000)),
             ]);
         });
 
