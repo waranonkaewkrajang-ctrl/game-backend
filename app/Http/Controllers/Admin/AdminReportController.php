@@ -16,8 +16,8 @@ class AdminReportController extends Controller
     public function daily(Request $request): JsonResponse
     {
         $date = $request->input('date', now('Asia/Bangkok')->toDateString());
-        $startOfDay = \Carbon\Carbon::parse($date, 'Asia/Bangkok')->startOfDay()->utc();
-        $endOfDay = \Carbon\Carbon::parse($date, 'Asia/Bangkok')->endOfDay()->utc();
+        $startOfDay = \Carbon\Carbon::parse($date, 'Asia/Bangkok')->startOfDay();
+        $endOfDay = \Carbon\Carbon::parse($date, 'Asia/Bangkok')->endOfDay();
 
         return response()->json([
             'status' => 'success',
@@ -75,8 +75,8 @@ class AdminReportController extends Controller
         $from = $request->input('from', now('Asia/Bangkok')->startOfMonth()->toDateString());
         $to = $request->input('to', now('Asia/Bangkok')->toDateString());
         // 🇹🇭 Parse date เป็น Bangkok time แล้วแปลงเป็น UTC (เพราะ DB เก็บ UTC)
-        $start = \Carbon\Carbon::parse($from, 'Asia/Bangkok')->startOfDay()->utc();
-        $end = \Carbon\Carbon::parse($to, 'Asia/Bangkok')->endOfDay()->utc();
+        $start = \Carbon\Carbon::parse($from, 'Asia/Bangkok')->startOfDay();
+        $end = \Carbon\Carbon::parse($to, 'Asia/Bangkok')->endOfDay();
 
         $totalDeposit  = Deposit::where('status', 'approved')->whereBetween('approved_at', [$start, $end])->sum('amount');
         $totalWithdraw = Withdrawal::where('status', 'approved')->whereBetween('approved_at', [$start, $end])->sum('amount');

@@ -17,16 +17,16 @@ class AdminDashboardController extends Controller
     {
         try {
             // 1. จัดการวันที่อย่างปลอดภัย
-            $startDate = $request->filled('from') ? Carbon::parse($request->query('from'), 'Asia/Bangkok')->startOfDay()->utc() : Carbon::now('Asia/Bangkok')->startOfDay()->utc();
-            $endDate = $request->filled('to') ? Carbon::parse($request->query('to'), 'Asia/Bangkok')->endOfDay()->utc() : Carbon::now('Asia/Bangkok')->endOfDay()->utc();
-$thisMonth = Carbon::now('Asia/Bangkok')->startOfMonth()->utc();
+            $startDate = $request->filled('from') ? Carbon::parse($request->query('from'), 'Asia/Bangkok')->startOfDay() : Carbon::now('Asia/Bangkok')->startOfDay();
+            $endDate = $request->filled('to') ? Carbon::parse($request->query('to'), 'Asia/Bangkok')->endOfDay() : Carbon::now('Asia/Bangkok')->endOfDay();
+            $thisMonth = Carbon::now('Asia/Bangkok')->startOfMonth();
 
-$chartStartDate = $request->filled('from') ? Carbon::parse($request->query('from'), 'Asia/Bangkok')->startOfDay()->utc() : Carbon::now('Asia/Bangkok')->subDays(6)->startOfDay()->utc();
+            $chartStartDate = $request->filled('from') ? Carbon::parse($request->query('from'), 'Asia/Bangkok')->startOfDay() : Carbon::now('Asia/Bangkok')->subDays(6)->startOfDay();
             $chartEndDate = $endDate->copy();
 
             // 2. ดึงข้อมูลแบบ SQL Group By (CONVERT_TZ — แม่นยำ ไม่ขึ้นกับ PHP timezone)
             $depositRows = \DB::table('deposits')
-                ->selectRaw("DATE(CONVERT_TZ(approved_at,'+00:00','+07:00')) as d, SUM(amount) as total")
+                ->selectRaw("DATE(approved_at) as d, SUM(amount) as total")
                 ->where('status', 'approved')
                 ->whereBetween('approved_at', [$chartStartDate, $chartEndDate])
                 ->groupBy('d')->pluck('total', 'd');
@@ -38,21 +38,21 @@ $chartStartDate = $request->filled('from') ? Carbon::parse($request->query('from
                 ->groupBy('d')->pluck('total', 'd');
 
             $betRows = \DB::table('transactions')
-                ->selectRaw("DATE(CONVERT_TZ(created_at,'+00:00','+07:00')) as d, SUM(amount) as total")
+                ->selectRaw("DATE(created_at) as d, SUM(amount) as total")
                 ->where('type', 'bet')
                 ->whereBetween('created_at', [$chartStartDate, $chartEndDate])
                 ->groupBy('d')->pluck('total', 'd');
 
             $winRows = \DB::table('transactions')
-                ->selectRaw("DATE(CONVERT_TZ(created_at,'+00:00','+07:00')) as d, SUM(amount) as total")
+                ->selectRaw("DATE(created_at) as d, SUM(amount) as total")
                 ->where('type', 'win')
                 ->whereBetween('created_at', [$chartStartDate, $chartEndDate])
                 ->groupBy('d')->pluck('total', 'd');
 
             // 3. สร้าง chart data ตามวัน (Bangkok)
             $chartData = [];
-            $cursor = $chartStartDate->copy()->setTimezone('Asia/Bangkok')->startOfDay();
-            $chartEndBkk = $chartEndDate->copy()->setTimezone('Asia/Bangkok')->endOfDay();
+            $cursor = $chartStartDate->copy()->startOfDay();
+            $chartEndBkk = $chartEndDate->copy()->endOfDay();
 
             while ($cursor->lte($chartEndBkk)) {
                 $key = $cursor->format('Y-m-d');
