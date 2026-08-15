@@ -410,6 +410,14 @@ Route::prefix('admin')->group(function () {
             return response()->json(['status' => 'error', 'message' => 'ส่งไม่สำเร็จ เช็ค Token กับ Chat ID'], 400);
         });
 
+        Route::post('/settings/telegram-fetch-chats', function (\Illuminate\Http\Request $request) {
+            $token = $request->input('bot_token') ?: \App\Models\Setting::getValue('telegram_bot_token');
+            if (!$token) {
+                return response()->json(['status' => 'error', 'message' => 'กรุณาใส่ Bot Token ก่อน'], 400);
+            }
+            return response()->json(app(\App\Services\TelegramService::class)->fetchChatIds($token));
+        });
+
         // Game (Admin) — AMB Seamless
         Route::get('/games/agent-credit', [GameController::class, 'agentCredit']);
         Route::get('/games/bet-records',  [GameController::class, 'betRecords']);
