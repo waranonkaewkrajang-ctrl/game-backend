@@ -105,7 +105,30 @@ class AdminUnmatchedDepositController extends Controller
             'approved_at'     => now(),
         ]);
 
-        // แจ้ง Telegram
+        // ← ★ เพิ่มตรงนี้ ระหว่าง update กับ แจ้ง Telegram ★
+
+        // บันทึกรายการเดินบัญชี
+        try {
+            \App\Models\BankStatement::create([
+                'deposit_id'       => $deposit->id,
+                'user_id'          => $user->id,
+                'amount'           => $unmatchedDeposit->amount,
+                'bank_code'        => null,
+                'bank_account'     => null,
+                'bank_name'        => null,
+                'from_name'        => null,
+                'from_account'     => $unmatchedDeposit->from_account,
+                'from_bank_code'   => $unmatchedDeposit->bank,
+                'reference_id'     => $deposit->reference_id,
+                'approved_method'  => 'manual',
+                'approved_by'      => $request->user()->id,
+                'transaction_time' => now(),
+            ]);
+        } catch (\Exception $e) {
+            \Log::error("BankStatement log failed for unmatched #{$unmatchedDeposit->id}: {$e->getMessage()}");
+        }
+
+        // แจ้ง Telegram   ← บรรทัดเดิมที่มีอยู่แล้ว
         try {
             app(TelegramService::class)->send(
                 "✅ <b>อนุมัติยอดค้าง</b>\n" .
