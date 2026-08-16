@@ -16,7 +16,7 @@ class AdminDepositController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $deposits = Deposit::with(['user', 'admin'])
+        $deposits = Deposit::with(['user', 'approvedBy'])
             ->when($request->status, fn ($q, $s) => $q->where('status', $s))
             ->when($request->date_from, fn ($q, $d) => $q->whereDate('created_at', '>=', $d))
             ->when($request->date_to, fn ($q, $d) => $q->whereDate('created_at', '<=', $d))
