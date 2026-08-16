@@ -16,7 +16,7 @@ class AdminDepositController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $deposits = Deposit::with('user')
+        $deposits = Deposit::with(['user', 'admin'])
             ->when($request->status, fn ($q, $s) => $q->where('status', $s))
             ->when($request->date_from, fn ($q, $d) => $q->whereDate('created_at', '>=', $d))
             ->when($request->date_to, fn ($q, $d) => $q->whereDate('created_at', '<=', $d))
@@ -38,11 +38,13 @@ class AdminDepositController extends Controller
     public function approve(Request $request, Deposit $deposit): JsonResponse
     {
         try {
-            $deposit = $this->depositService->approve($deposit, $request->user()->id);
-            
-            if ($request->input('approved_method') === 'auto') {
-                $deposit->update(['approved_method' => 'auto']);
-            }
+            // บล็อก B — set approved_method ก่อน
+$deposit->update([
+   'approved_method' => $request->input('approved_method', 'manual'),
+]);
+
+// บล็อก A — แล้วค่อย approve (ตอนสร้าง bank_statement จะเห็น approved_method แล้ว)
+$deposit = $this->depositService->approve($deposit, $request->user()->id);
 
             // 🆕 Broadcast event ไปหา user ที่ฝาก → frontend จะเด้ง popup
             broadcast(new \App\Events\DepositApproved($deposit->fresh()));
