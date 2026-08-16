@@ -109,14 +109,28 @@ class AdminUnmatchedDepositController extends Controller
 
         // บันทึกรายการเดินบัญชี
         try {
+            $bankName = null;
+            $bankAccount = null;
+            $bankCode = null;
+            try {
+                $settingRaw = \App\Models\Setting::where('key', 'deposit_banks')->value('value');
+                $banks = $settingRaw ? json_decode($settingRaw, true) : [];
+                $matched = collect($banks)->first();
+                if ($matched) {
+                    $bankCode    = $matched['bank_code'] ?? null;
+                    $bankAccount = $matched['bank_account'] ?? null;
+                    $bankName    = $matched['bank_name'] ?? null;
+                }
+            } catch (\Exception $e) {}
+
             \App\Models\BankStatement::create([
                 'deposit_id'       => $deposit->id,
                 'user_id'          => $user->id,
                 'amount'           => $unmatchedDeposit->amount,
-                'bank_code'        => null,
-                'bank_account'     => null,
-                'bank_name'        => null,
-                'from_name'        => null,
+                'bank_code'        => $bankCode,
+                'bank_account'     => $bankAccount,
+                'bank_name'        => $bankName,
+                'from_name'        => $user->bank_name,
                 'from_account'     => $unmatchedDeposit->from_account,
                 'from_bank_code'   => $unmatchedDeposit->bank,
                 'reference_id'     => $deposit->reference_id,
