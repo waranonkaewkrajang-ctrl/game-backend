@@ -114,6 +114,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/withdrawals',               [WithdrawalController::class, 'index']);
     Route::get('/withdrawals/{withdrawal}',  [WithdrawalController::class, 'show']);
 
+    Route::get('/turnover/status', [\App\Http\Controllers\Api\TurnoverController::class, 'status']);
+
     // วงล้อ
     Route::get('/spin-wheel',         [\App\Http\Controllers\Api\SpinWheelController::class, 'index']);
     Route::post('/spin-wheel/spin',   [\App\Http\Controllers\Api\SpinWheelController::class, 'spin']);

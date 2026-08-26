@@ -30,6 +30,25 @@ class WithdrawalService
             throw new \Exception('ยอดเงินไม่เพียงพอ');
         }
 
+        // =====================================================
+        //  🆕 เช็คเทิร์นโอเวอร์ก่อนอนุญาตถอน
+        // =====================================================
+        $turnoverCheck = $this->walletService->checkTurnover($user);
+
+        if ($turnoverCheck['has_active']) {
+            $remaining = number_format($turnoverCheck['total_remaining'], 2);
+
+            $details = $turnoverCheck['claims']->map(function ($claim) {
+                $current  = number_format($claim->turnover_current, 2);
+                $required = number_format($claim->turnover_required, 2);
+                return "{$claim->type}: {$current}/{$required}";
+            })->implode(', ');
+
+            throw new \Exception(
+                "ยังทำเทิร์นไม่ครบ ต้องเดิมพันอีก {$remaining} บาท ({$details})"
+            );
+        }
+
         $balanceBefore = $wallet->balance;
 
         $this->walletService->withdraw(
