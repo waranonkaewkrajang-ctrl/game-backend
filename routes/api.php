@@ -338,6 +338,11 @@ Route::prefix('admin')->group(function () {
         Route::post('/users/{user}/adjust', [AdminUserController::class, 'adjustBalance']);
         Route::post('/users/{user}/adjust-tickets', [AdminUserController::class, 'adjustTickets']);
         Route::post('/users/{user}/adjust-points', [AdminUserController::class, 'adjustPoints']);
+        
+        Route::post('/users/{user}/adjust', [AdminUserController::class, 'adjustBalance']);
+        Route::post('/users/{user}/adjust-tickets', [AdminUserController::class, 'adjustTickets']);
+        Route::post('/users/{user}/adjust-points', [AdminUserController::class, 'adjustPoints']);
+        Route::post('/users/{user}/bonus', [AdminUserController::class, 'giveBonus']);  // 🆕 ให้เครดิตฟรี
 
         Route::post('/users/{user}/reset-password', function (\Illuminate\Http\Request $request, \App\Models\User $user) {
             $data = $request->validate(['password' => 'required|string|min:6|max:50']);
