@@ -278,20 +278,20 @@ class AdminUserController extends Controller
                 ],
             );
 
-            // แจ้ง Telegram (ถ้ามี)
+                        // แจ้ง Telegram
             try {
                 $multiplier = $data['turnover_multiplier'] ?? 0;
                 $turnover   = (float) $data['amount'] * $multiplier;
-                $msg  = "🎁 *ให้เครดิตฟรี*\n";
+                $msg  = "🎁 <b>ให้เครดิตฟรี</b>\n";
                 $msg .= "👤 {$user->username}\n";
                 $msg .= "💰 " . number_format($data['amount'], 2) . " บาท\n";
                 $msg .= "🔄 เทิร์น {$multiplier}x = " . number_format($turnover, 2) . "\n";
-                if ($data['note']) $msg .= "📝 {$data['note']}\n";
+                if (!empty($data['note'])) $msg .= "📝 {$data['note']}\n";
                 $msg .= "👨‍💼 Admin: " . $request->user()->name;
 
-                \App\Helpers\TelegramHelper::send($msg);
+                app(\App\Services\TelegramService::class)->send($msg);
             } catch (\Exception $e) {
-                // ignore — ไม่ให้ telegram error กระทบ
+                // ignore
             }
 
             return response()->json([
