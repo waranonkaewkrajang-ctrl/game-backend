@@ -77,8 +77,8 @@ class WalletService
     }
 
     public function bet(User $user, float $amount, string $roundId, string $gameId, string $provider, array $rawData = []): Transaction
-    {
-        $this->validateAmount($amount);
+{
+    $this->validateBetAmount($amount);
 
         return DB::transaction(function () use ($user, $amount, $roundId, $gameId, $provider, $rawData) {
             $wallet = Wallet::where('user_id', $user->id)->lockForUpdate()->firstOrFail();
@@ -266,10 +266,17 @@ class WalletService
         }
     }
 
-    private function validateAmount(float $amount): void
+            private function validateAmount(float $amount): void
     {
         if ($amount <= 0) {
             throw new \InvalidArgumentException('จำนวนเงินต้องมากกว่า 0');
+        }
+    }
+
+    private function validateBetAmount(float $amount): void
+    {
+        if ($amount < 0) {
+            throw new \InvalidArgumentException('จำนวนเงินเดิมพันต้องไม่ติดลบ');
         }
     }
 
