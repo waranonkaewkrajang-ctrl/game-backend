@@ -245,6 +245,68 @@ class AdminUserController extends Controller
         ]);
     }
 
+        // =========================================================
+    //  🆕 ให้เครดิตฟรี (พร้อมตั้งเทิร์นโอเวอร์)
+    // =========================================================
+
+    public function giveBonus(Request $request, User $user): JsonResponse
+    {
+        $data = $request->validate([
+            'amount'              => 'required|numeric|min:1',
+            'turnover_multiplier' => 'nullable|numeric|min:0',
+            'expired_hours'       => 'nullable|integer|min:0',
+            'note'                => 'nullable|string|max:255',
+        ]);
+
+        try {
+            $expiredAt = null;
+            if (!empty($data['expired_hours']) && $data['expired_hours'] > 0) {
+                $expiredAt = now()->addHours($data['expired_hours']);
+            }
+
+            $transaction = $this->walletService->addBonus(
+                $user,
+                (float) $data['amount'],
+                'เครดิตฟรี: ' . ($data['note'] ?? ''),
+                [],
+                $request->user()->id,
+                [
+                    'turnover_multiplier' => $data['turnover_multiplier'] ?? null,
+                    'type'                => 'free_credit',
+                    'expired_at'          => $expiredAt,
+                    'note'                => $data['note'] ?? null,
+                ],
+            );
+
+            // แจ้ง Telegram (ถ้ามี)
+            try {
+                $multiplier = $data['turnover_multiplier'] ?? 0;
+                $turnover   = (float) $data['amount'] * $multiplier;
+                $msg  = "🎁 *ให้เครดิตฟรี*\n";
+                $msg .= "👤 {$user->username}\n";
+                $msg .= "💰 " . number_format($data['amount'], 2) . " บาท\n";
+                $msg .= "🔄 เทิร์น {$multiplier}x = " . number_format($turnover, 2) . "\n";
+                if ($data['note']) $msg .= "📝 {$data['note']}\n";
+                $msg .= "👨‍💼 Admin: " . $request->user()->name;
+
+                \App\Helpers\TelegramHelper::send($msg);
+            } catch (\Exception $e) {
+                // ignore — ไม่ให้ telegram error กระทบ
+            }
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => "ให้เครดิตฟรี {$data['amount']} บาท สำเร็จ",
+                'data'    => $transaction,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => $e->getMessage(),
+            ], 400);
+        }
+    }
+
     // =========================================================
     // แทรกเพิ่มตรงนี้: ส่วนของการจัดการสิทธิ์และพนักงาน (Admins)
     // =========================================================
