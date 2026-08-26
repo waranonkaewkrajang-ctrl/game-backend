@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\PromotionClaim;
+use App\Models\Setting;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\Wallet;
@@ -170,36 +172,88 @@ class WalletService
         });
     }
 
-    public function addBonus(User $user, float $amount, string $description = 'โบนัส', array $meta = [], ?int $adminId = null): Transaction
-    {
-        $this->validateAmount($amount);
+    /**
+ * ให้โบนัส + สร้าง PromotionClaim
+ *
+ * @param array $options เงื่อนไขที่แอดมินตั้งเอง:
+ *   - turnover_multiplier : float       (ไม่ส่ง → อ่านจาก settings)
+ *   - type                : string      (free_credit / deposit_bonus / spin_reward / manual)
+ *   - promotion_id        : int|null
+ *   - deposit_id          : int|null
+ *   - expired_at          : string|null (เช่น '2026-09-01 23:59:59')
+ *   - note                : string|null
+ */
+public function addBonus(
+    User $user,
+    float $amount,
+    string $description = 'โบนัส',
+    array $meta = [],
+    ?int $adminId = null,
+    array $options = [],
+): Transaction {
+    $this->validateAmount($amount);
 
-        return DB::transaction(function () use ($user, $amount, $description, $meta, $adminId) {
-            $wallet = Wallet::where('user_id', $user->id)->lockForUpdate()->firstOrFail();
+    // อ่าน multiplier: แอดมินส่งมา → ใช้เลย, ไม่ส่ง → อ่านจาก settings
+    $multiplier = (float) ($options['turnover_multiplier']
+        ?? Setting::getValue('default_turnover_multiplier', 1));
 
-            $balanceBefore = $wallet->balance;
-            $balanceAfter  = bcadd($balanceBefore, $amount, 2);
+    $type      = $options['type']       ?? 'free_credit';
+    $expiredAt = $options['expired_at'] ?? null;
+    $note      = $options['note']       ?? null;
 
-            $wallet->update([
-                'balance'       => $balanceAfter,
-                'bonus_balance' => bcadd($wallet->bonus_balance, $amount, 2),
+    return DB::transaction(function () use (
+        $user, $amount, $description, $meta, $adminId,
+        $multiplier, $type, $expiredAt, $note, $options,
+    ) {
+        $wallet = Wallet::where('user_id', $user->id)->lockForUpdate()->firstOrFail();
+
+        $balanceBefore = $wallet->balance;
+        $balanceAfter  = bcadd($balanceBefore, $amount, 2);
+
+        $wallet->update([
+            'balance'       => $balanceAfter,
+            'bonus_balance' => bcadd($wallet->bonus_balance, $amount, 2),
+        ]);
+
+        // สร้าง PromotionClaim (ถ้า multiplier > 0)
+        $turnoverRequired = bcmul($amount, $multiplier, 2);
+
+        if ($multiplier > 0) {
+            PromotionClaim::create([
+                'user_id'             => $user->id,
+                'promotion_id'        => $options['promotion_id'] ?? null,
+                'deposit_id'          => $options['deposit_id']   ?? null,
+                'type'                => $type,
+                'bonus_amount'        => $amount,
+                'turnover_multiplier' => $multiplier,
+                'turnover_required'   => $turnoverRequired,
+                'turnover_current'    => 0,
+                'turnover_completed'  => false,
+                'status'              => 'active',
+                'granted_by'          => $adminId,
+                'expired_at'          => $expiredAt,
+                'note'                => $note,
             ]);
+        }
 
-            return Transaction::create([
-                'user_id'        => $user->id,
-                'reference_id'   => $this->generateReferenceId('BNS'),
-                'type'           => 'bonus',
-                'direction'      => 'in',
-                'amount'         => $amount,
-                'balance_before' => $balanceBefore,
-                'balance_after'  => $balanceAfter,
-                'description'    => $description,
-                'meta'           => $meta,
-                'status'         => 'completed',
-                'processed_by'   => $adminId,
-            ]);
-        });
-    }
+        return Transaction::create([
+            'user_id'        => $user->id,
+            'reference_id'   => $this->generateReferenceId('BNS'),
+            'type'           => 'bonus',
+            'direction'      => 'in',
+            'amount'         => $amount,
+            'balance_before' => $balanceBefore,
+            'balance_after'  => $balanceAfter,
+            'description'    => $description,
+            'meta'           => array_merge($meta, [
+                'turnover_multiplier' => $multiplier,
+                'turnover_required'   => $turnoverRequired,
+            ]),
+            'status'         => 'completed',
+            'processed_by'   => $adminId,
+        ]);
+    });
+}
 
     public function adjust(User $user, float $amount, string $description, int $adminId): Transaction
     {
@@ -247,24 +301,62 @@ class WalletService
         return Wallet::create(['user_id' => $user->id]);
     }
 
-    private function updateTurnover(User $user, float $betAmount): void
+    // =====================================================
+    //  🆕 ใส่ตรงนี้
+    // =====================================================
+
+    /**
+     * เช็คว่า user มีเทิร์นค้างหรือไม่ — ใช้ตอนกดถอน
+     */
+    public function checkTurnover(User $user): array
     {
         $activeClaims = $user->promotionClaims()
             ->where('status', 'active')
             ->where('turnover_completed', false)
             ->get();
 
-        foreach ($activeClaims as $claim) {
-            $newTurnover = bcadd($claim->turnover_current, $betAmount, 2);
-            $completed   = $newTurnover >= $claim->turnover_required;
+        // Auto-expire ตัวที่หมดอายุ
+        $activeClaims->each(function ($claim) {
+            if ($claim->isExpired()) {
+                $claim->update(['status' => 'expired']);
+            }
+        });
 
-            $claim->update([
-                'turnover_current'   => $newTurnover,
-                'turnover_completed' => $completed,
-                'status'             => $completed ? 'completed' : 'active',
-            ]);
-        }
+        // กรองเหลือเฉพาะ active จริงๆ
+        $validClaims = $activeClaims->where('status', 'active');
+
+        return [
+            'has_active'      => $validClaims->isNotEmpty(),
+            'claims'          => $validClaims,
+            'total_remaining' => (float) $validClaims->sum(fn ($c) => $c->remaining),
+        ];
     }
+
+    private function updateTurnover(User $user, float $betAmount): void
+{
+    $activeClaims = $user->promotionClaims()
+        ->where('status', 'active')
+        ->where('turnover_completed', false)
+        ->get();
+
+    foreach ($activeClaims as $claim) {
+        // เช็คหมดอายุก่อนนับ
+        if ($claim->isExpired()) {
+            $claim->update(['status' => 'expired']);
+            continue;
+        }
+
+        $newTurnover = bcadd($claim->turnover_current, $betAmount, 2);
+        $completed   = $newTurnover >= $claim->turnover_required;
+
+        $claim->update([
+            'turnover_current'   => $newTurnover,
+            'turnover_completed' => $completed,
+            'status'             => $completed ? 'completed' : 'active',
+            'completed_at'       => $completed ? now() : null,
+        ]);
+    }
+}
 
             private function validateAmount(float $amount): void
     {
