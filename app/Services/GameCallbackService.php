@@ -97,10 +97,33 @@ class GameCallbackService
             ];
         }
 
-        try {
+                try {
+            $winAmount = (float) $data['win_amount'];
+
+            // แพ้ (win_amount = 0) → บันทึก game_log ปิด round แต่ไม่บวกเงิน
+            if ($winAmount <= 0) {
+                GameLog::create([
+                    'user_id'        => $user->id,
+                    'provider'       => $data['provider'],
+                    'game_id'        => $data['game_id'],
+                    'round_id'       => $data['round_id'] . '_win',
+                    'action'         => 'win',
+                    'bet_amount'     => 0,
+                    'win_amount'     => 0,
+                    'balance_before' => $this->walletService->getBalance($user),
+                    'balance_after'  => $this->walletService->getBalance($user),
+                    'raw_data'       => $data['raw'] ?? [],
+                ]);
+
+                return [
+                    'status'  => 'success',
+                    'balance' => $this->walletService->getBalance($user),
+                ];
+            }
+
             $transaction = $this->walletService->win(
                 $user,
-                (float) $data['win_amount'],
+                $winAmount,
                 $data['round_id'],
                 $data['game_id'],
                 $data['provider'],
