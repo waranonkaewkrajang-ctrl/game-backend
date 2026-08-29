@@ -255,20 +255,15 @@ class GameController extends Controller
             ]);
         }
 
-        // บวก payoutAmount (ถ้ามี)
-        if ($payoutAmount > 0) {
-            $result = $this->callbackService->processWin([
-                'username'   => $username,
-                'round_id'   => $roundId,
-                'game_id'    => $gameCode,
-                'provider'   => $provider,
-                'win_amount' => $payoutAmount,
-                'raw'        => $request->all(),
-            ]);
-        } else {
-            // แพ้ (payoutAmount = 0) ไม่ต้องบวกเงิน
-            $result = ['status' => 'success', 'balance' => $user ? $this->walletService->getBalance($user) : 0];
-        }
+                // บันทึกทุก round (ชนะ + แพ้) เพื่อปิด round ไม่ให้ค้าง
+        $result = $this->callbackService->processWin([
+            'username'   => $username,
+            'round_id'   => $roundId,
+            'game_id'    => $gameCode,
+            'provider'   => $provider,
+            'win_amount' => $payoutAmount,
+            'raw'        => $request->all(),
+        ]);
 
         $statusCode = ($result['status'] === 'success') ? 0 : 10001;
         $balanceAfter = (float) ($result['balance'] ?? ($user ? $this->walletService->getBalance($user) : 0));
