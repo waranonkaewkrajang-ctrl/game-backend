@@ -107,7 +107,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Deposit
     Route::post('/deposits',          [DepositController::class, 'store']);
     Route::get('/deposits',           [DepositController::class, 'index']);
+    Route::get('/deposits/available-channels', [DepositController::class, 'availableChannels']);
     Route::get('/deposits/{deposit}', [DepositController::class, 'show']);
+    
 
     // Withdrawal
     Route::post('/withdrawals',              [WithdrawalController::class, 'store']);
