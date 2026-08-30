@@ -67,4 +67,25 @@ class DepositController extends Controller
             'data'   => $deposit,
         ]);
     }
+
+    // 🆕 คืนช่องทางฝากตาม bank_code ของ user
+    public function availableChannels(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $allChannels = json_decode(
+            \App\Models\Setting::getValue('deposit_channels', '["bank_transfer","promptpay","truewallet"]'),
+            true
+        ) ?: ['bank_transfer', 'promptpay', 'truewallet'];
+
+        if (strtoupper($user->bank_code) === 'TRUEWALLET') {
+            $filtered = array_values(array_filter($allChannels, fn ($ch) => $ch === 'truewallet'));
+        } else {
+            $filtered = array_values(array_filter($allChannels, fn ($ch) => $ch !== 'truewallet'));
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => $filtered,
+        ]);
+    }
 }
