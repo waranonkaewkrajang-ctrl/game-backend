@@ -189,6 +189,7 @@ class GameController extends Controller
 
         $result = $this->callbackService->processBet([
             'username'   => $username,
+            'txn_id'     => $txn['id'] ?? null,    // 🆕
             'round_id'   => $txn['roundId'] ?? $request->input('roundId'),
             'game_id'    => $txn['gameCode'] ?? $request->input('gameCode'),
             'provider'   => $request->input('productId', 'AMB'),
