@@ -34,28 +34,32 @@ class GameCallbackService
             return ['status' => 'error', 'message' => 'USER_NOT_FOUND'];
         }
 
-        $existingLog = GameLog::where('round_id', $data['round_id'])
-            ->where('action', 'bet')
-            ->first();
+        // 🆕 ใช้ txn_id เช็ค duplicate (AMB ส่งหลาย txn ใน round เดียวกันได้)
+$txnId = $data['txn_id'] ?? null;
+$logRoundId = $txnId ? $data['round_id'] . '|' . $txnId : $data['round_id'];
 
-        if ($existingLog) {
-            Log::warning('Duplicate bet callback', ['round_id' => $data['round_id']]);
-            return [
-                'status'  => 'success',
-                'balance' => $this->walletService->getBalance($user),
-                'message' => 'DUPLICATE',
-            ];
-        }
+$existingLog = GameLog::where('round_id', $logRoundId)
+    ->where('action', 'bet')
+    ->first();
 
-        try {
-            $transaction = $this->walletService->bet(
-                $user,
-                (float) $data['bet_amount'],
-                $data['round_id'],
-                $data['game_id'],
-                $data['provider'],
-                $data['raw'] ?? []
-            );
+if ($existingLog) {
+    Log::warning('Duplicate bet callback', ['round_id' => $data['round_id'], 'txn_id' => $txnId]);
+    return [
+        'status'  => 'success',
+        'balance' => $this->walletService->getBalance($user),
+        'message' => 'DUPLICATE',
+    ];
+}
+
+try {
+    $transaction = $this->walletService->bet(
+        $user,
+        (float) $data['bet_amount'],
+        $logRoundId,
+        $data['game_id'],
+        $data['provider'],
+        $data['raw'] ?? []
+    );
 
             return [
                 'status'  => 'success',
@@ -76,7 +80,7 @@ class GameCallbackService
         }
     }
 
-    public function processWin(array $data): array
+        public function processWin(array $data): array
     {
         $user = User::where('amb_username', $data['username'])->first();
 
@@ -84,7 +88,10 @@ class GameCallbackService
             return ['status' => 'error', 'message' => 'USER_NOT_FOUND'];
         }
 
-        $existingLog = GameLog::where('round_id', $data['round_id'] . '_win')
+        $txnId = $data['txn_id'] ?? null;
+        $logRoundId = $txnId ? $data['round_id'] . '|' . $txnId : $data['round_id'];
+
+        $existingLog = GameLog::where('round_id', $logRoundId . '_win')
             ->where('action', 'win')
             ->first();
 
@@ -106,7 +113,7 @@ class GameCallbackService
                     'user_id'        => $user->id,
                     'provider'       => $data['provider'],
                     'game_id'        => $data['game_id'],
-                    'round_id'       => $data['round_id'] . '_win',
+                    'round_id'       => $logRoundId . '_win',
                     'action'         => 'win',
                     'bet_amount'     => 0,
                     'win_amount'     => 0,
@@ -124,7 +131,7 @@ class GameCallbackService
             $transaction = $this->walletService->win(
                 $user,
                 $winAmount,
-                $data['round_id'],
+                $logRoundId,
                 $data['game_id'],
                 $data['provider'],
                 $data['raw'] ?? []
