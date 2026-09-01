@@ -257,13 +257,14 @@ class GameController extends Controller
 
                 // บันทึกทุก round (ชนะ + แพ้) เพื่อปิด round ไม่ให้ค้าง
         $result = $this->callbackService->processWin([
-            'username'   => $username,
-            'round_id'   => $roundId,
-            'game_id'    => $gameCode,
-            'provider'   => $provider,
-            'win_amount' => $payoutAmount,
-            'raw'        => $request->all(),
-        ]);
+    'username'   => $username,
+    'txn_id'     => $txn['id'] ?? null,    // 🆕
+    'round_id'   => $roundId,
+    'game_id'    => $gameCode,
+    'provider'   => $provider,
+    'win_amount' => $payoutAmount,
+    'raw'        => $request->all(),
+]);
 
         $statusCode = ($result['status'] === 'success') ? 0 : 10001;
         $balanceAfter = (float) ($result['balance'] ?? ($user ? $this->walletService->getBalance($user) : 0));
