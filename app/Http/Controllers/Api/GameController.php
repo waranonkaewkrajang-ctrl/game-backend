@@ -181,24 +181,26 @@ class GameController extends Controller
         }
 
         $txns = $request->input('txns', []);
-        $txn = $txns[0] ?? [];
 
-        // ดึง balance ก่อนหัก
         $user = \App\Models\User::where('amb_username', $username)->first();
         $balanceBefore = $user ? $this->walletService->getBalance($user) : 0;
 
-        $result = $this->callbackService->processBet([
-            'username'   => $username,
-            'txn_id'     => $txn['id'] ?? null,    // 🆕
-            'round_id'   => $txn['roundId'] ?? $request->input('roundId'),
-            'game_id'    => $txn['gameCode'] ?? $request->input('gameCode'),
-            'provider'   => $request->input('productId', 'AMB'),
-            'bet_amount' => $txn['betAmount'] ?? $request->input('amount', 0),
-            'raw'        => $request->all(),
-        ]);
+        $result = ['status' => 'success', 'balance' => $balanceBefore];
+
+        foreach ($txns as $txn) {
+            $result = $this->callbackService->processBet([
+                'username'   => $username,
+                'txn_id'     => $txn['id'] ?? null,
+                'round_id'   => $txn['roundId'] ?? $request->input('roundId'),
+                'game_id'    => $txn['gameCode'] ?? $request->input('gameCode'),
+                'provider'   => $request->input('productId', 'AMB'),
+                'bet_amount' => $txn['betAmount'] ?? $request->input('amount', 0),
+                'raw'        => $request->all(),
+            ]);
+        }
 
         $statusCode = ($result['status'] === 'success') ? 0 : 10001;
-        $balanceAfter = (float) ($result['balance'] ?? $balanceBefore);
+        $balanceAfter = (float) ($result['balance'] ?? ($user ? $this->walletService->getBalance($user) : 0));
 
         return response()->json([
             'id'              => $request->input('id', uniqid()),
@@ -232,40 +234,42 @@ class GameController extends Controller
         }
 
         $txns = $request->input('txns', []);
-        $txn = $txns[0] ?? [];
 
         $user = \App\Models\User::where('amb_username', $username)->first();
         $balanceBefore = $user ? $this->walletService->getBalance($user) : 0;
-
-        $isSingleState = (bool) ($txn['isSingleState'] ?? false);
-        $betAmount = (float) ($txn['betAmount'] ?? 0);
-        $payoutAmount = (float) ($txn['payoutAmount'] ?? $request->input('amount', 0));
-        $roundId = $txn['roundId'] ?? $request->input('roundId');
-        $gameCode = $txn['gameCode'] ?? $request->input('gameCode');
         $provider = $request->input('productId', 'AMB');
 
-        // Single-state (เช่น PGSOFT): หัก betAmount ก่อน แล้วค่อยบวก payoutAmount
-        if ($isSingleState && $betAmount > 0) {
-            $this->callbackService->processBet([
+        $result = ['status' => 'success', 'balance' => $balanceBefore];
+
+        foreach ($txns as $txn) {
+            $isSingleState = (bool) ($txn['isSingleState'] ?? false);
+            $betAmount = (float) ($txn['betAmount'] ?? 0);
+            $payoutAmount = (float) ($txn['payoutAmount'] ?? 0);
+            $roundId = $txn['roundId'] ?? $request->input('roundId');
+            $gameCode = $txn['gameCode'] ?? $request->input('gameCode');
+
+            if ($isSingleState && $betAmount > 0) {
+                $this->callbackService->processBet([
+                    'username'   => $username,
+                    'txn_id'     => $txn['id'] ?? null,
+                    'round_id'   => $roundId,
+                    'game_id'    => $gameCode,
+                    'provider'   => $provider,
+                    'bet_amount' => $betAmount,
+                    'raw'        => $request->all(),
+                ]);
+            }
+
+            $result = $this->callbackService->processWin([
                 'username'   => $username,
+                'txn_id'     => $txn['id'] ?? null,
                 'round_id'   => $roundId,
                 'game_id'    => $gameCode,
                 'provider'   => $provider,
-                'bet_amount' => $betAmount,
+                'win_amount' => $payoutAmount,
                 'raw'        => $request->all(),
             ]);
         }
-
-                // บันทึกทุก round (ชนะ + แพ้) เพื่อปิด round ไม่ให้ค้าง
-        $result = $this->callbackService->processWin([
-    'username'   => $username,
-    'txn_id'     => $txn['id'] ?? null,    // 🆕
-    'round_id'   => $roundId,
-    'game_id'    => $gameCode,
-    'provider'   => $provider,
-    'win_amount' => $payoutAmount,
-    'raw'        => $request->all(),
-]);
 
         $statusCode = ($result['status'] === 'success') ? 0 : 10001;
         $balanceAfter = (float) ($result['balance'] ?? ($user ? $this->walletService->getBalance($user) : 0));
