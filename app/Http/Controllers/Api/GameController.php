@@ -182,6 +182,19 @@ class GameController extends Controller
 
         $txns = $request->input('txns', []);
 
+        // 🆕 Log raw request เพื่อพิสูจน์
+        Log::info('RAW placeBets', [
+            'productId' => $request->input('productId'),
+            'username'  => $username,
+            'txn_count' => count($txns),
+            'txns'      => collect($txns)->map(fn($t) => [
+                'id' => $t['id'] ?? null,
+                'betAmount' => $t['betAmount'] ?? null,
+                'playInfo' => $t['playInfo'] ?? null,
+                'roundId' => $t['roundId'] ?? null,
+            ])->toArray(),
+        ]);
+
         $user = \App\Models\User::where('amb_username', $username)->first();
         $balanceBefore = $user ? $this->walletService->getBalance($user) : 0;
 
