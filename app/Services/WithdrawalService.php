@@ -83,6 +83,12 @@ class WithdrawalService
             'approved_at' => now(),
         ]);
 
+                // 🆕 แจ้ง Sidebar อัพเดทจำนวน pending
+        try {
+            $pendingCount = Withdrawal::where('status', 'pending')->count();
+            event(new \App\Events\AdminBadgeUpdated('withdrawal', $pendingCount));
+        } catch (\Exception $e) {}
+
         return $withdrawal->fresh();
     }
 
@@ -107,6 +113,12 @@ class WithdrawalService
             'approved_by'   => $adminId,
             'approved_at'   => now(),
         ]);
+
+                // 🆕 แจ้ง Sidebar อัพเดทจำนวน pending
+        try {
+            $pendingCount = Withdrawal::where('status', 'pending')->count();
+            event(new \App\Events\AdminBadgeUpdated('withdrawal', $pendingCount));
+        } catch (\Exception $e) {}
 
         return $withdrawal->fresh();
     }
