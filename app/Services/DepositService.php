@@ -127,6 +127,12 @@ class DepositService
             \Log::error("BankStatement log failed for deposit #{$deposit->id}: {$e->getMessage()}");
         }
 
+                // 🆕 แจ้ง Sidebar อัพเดทจำนวน pending
+        try {
+            $pendingCount = Deposit::where('status', 'pending')->count();
+            event(new \App\Events\AdminBadgeUpdated('deposit', $pendingCount));
+        } catch (\Exception $e) {}
+
         return $deposit;
     }
 
@@ -142,6 +148,12 @@ class DepositService
             'approved_by'   => $adminId,
             'approved_at'   => now(),
         ]);
+
+                // 🆕 แจ้ง Sidebar อัพเดทจำนวน pending
+        try {
+            $pendingCount = Deposit::where('status', 'pending')->count();
+            event(new \App\Events\AdminBadgeUpdated('deposit', $pendingCount));
+        } catch (\Exception $e) {}
 
         return $deposit->fresh();
     }
