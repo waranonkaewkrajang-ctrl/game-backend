@@ -205,9 +205,15 @@ class GameController extends Controller
             $provider  = $request->input('productId', 'AMB');
             $playInfo  = $txn['playInfo'] ?? '';
 
-            // 🆕 ป๊อกเด้งทุกค่าย: playInfo = "Player X-Y" (X=เด้ง, Y=ยอดวางจริง)
-            if (preg_match('/^Player\s*(\d+)-(\d+)$/i', $playInfo, $m)) {
-                $betAmount = (float) $m[2];
+            // 🆕 ป๊อกเด้งทุกค่าย: playInfo อาจเป็น "Player 2-5" หรือ "Player 2-5,Player 1-10"
+            if (preg_match_all('/Player\s*\d+-(\d+)/i', $playInfo, $matches)) {
+                $realBet = 0;
+                foreach ($matches[1] as $amount) {
+                    $realBet += (float) $amount;
+                }
+                if ($realBet > 0) {
+                    $betAmount = $realBet;
+                }
             }
 
             $result = $this->callbackService->processBet([
