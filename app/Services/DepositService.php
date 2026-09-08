@@ -75,6 +75,30 @@ class DepositService
 
         $deposit = $deposit->fresh();
 
+        // 🆕 ให้ตั๋ววงล้ออัตโนมัติ ถ้าฝากเงินถึงขั้นต่ำ
+        try {
+            $spinEnabled   = Setting::getValue('spin_wheel_enabled', 'false') === 'true';
+            $condition     = Setting::getValue('spin_wheel_condition', 'free_daily');
+            $depositMin    = (float) Setting::getValue('spin_wheel_deposit_min', 0);
+
+            if ($spinEnabled && $condition === 'deposit_min' && $deposit->amount >= $depositMin) {
+                $wallet = $user->wallet;
+                if ($wallet) {
+                    $ticketsToGive = 1; // ฝากครบขั้นต่ำ = ได้ 1 ตั๋ว
+                    $wallet->increment('ticket_balance', $ticketsToGive);
+
+                    Log::info('Auto ticket granted', [
+                        'user_id'  => $user->id,
+                        'deposit'  => $deposit->amount,
+                        'tickets'  => $ticketsToGive,
+                        'balance'  => $wallet->fresh()->ticket_balance,
+                    ]);
+                }
+            }
+        } catch (\Exception $e) {
+            Log::warning('Auto ticket failed', ['error' => $e->getMessage()]);
+        }
+
         // 🆕 บันทึก Bank Statement + broadcast (กัน error ไม่ให้กระทบ approve)
         try {
             // ดึงข้อมูลบัญชีลูกค้า (ผู้โอน) จาก User
