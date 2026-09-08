@@ -201,28 +201,13 @@ class GameController extends Controller
         $result = ['status' => 'success', 'balance' => $balanceBefore];
 
                 foreach ($txns as $txn) {
-            $betAmount = (float) ($txn['betAmount'] ?? $request->input('amount', 0));
-            $provider  = $request->input('productId', 'AMB');
-            $playInfo  = $txn['playInfo'] ?? '';
-
-            // 🆕 ป๊อกเด้งทุกค่าย: playInfo อาจเป็น "Player 2-5" หรือ "Player 2-5,Player 1-10"
-            if (preg_match_all('/Player\s*\d+-(\d+)/i', $playInfo, $matches)) {
-                $realBet = 0;
-                foreach ($matches[1] as $amount) {
-                    $realBet += (float) $amount;
-                }
-                if ($realBet > 0) {
-                    $betAmount = $realBet;
-                }
-            }
-
             $result = $this->callbackService->processBet([
                 'username'   => $username,
                 'txn_id'     => $txn['id'] ?? null,
                 'round_id'   => $txn['roundId'] ?? $request->input('roundId'),
                 'game_id'    => $txn['gameCode'] ?? $request->input('gameCode'),
-                'provider'   => $provider,
-                'bet_amount' => $betAmount,
+                'provider'   => $request->input('productId', 'AMB'),
+                'bet_amount' => $txn['betAmount'] ?? $request->input('amount', 0),
                 'raw'        => $request->all(),
             ]);
         }
