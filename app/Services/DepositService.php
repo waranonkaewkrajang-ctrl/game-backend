@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Deposit;
 use App\Models\Setting;
+use Illuminate\Support\Facades\Log;
 use App\Models\User;
 use Illuminate\Support\Str;
 
