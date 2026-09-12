@@ -150,13 +150,6 @@ class GameController extends Controller
         $result = $this->callbackService->getBalance($username);
         $statusCode = ($result['status'] === 'success') ? 0 : 10001;
 
-        // 🔍 DEBUG
-        Log::info('DEBUG getBalance', [
-            'username' => $username,
-            'product'  => $request->input('productId'),
-            'balance'  => (float) ($result['balance'] ?? 0),
-        ]);
-
         return response()->json([
             'id'              => $request->input('id', uniqid()),
             'statusCode'      => $statusCode,
@@ -218,29 +211,6 @@ class GameController extends Controller
                 'raw'        => $request->all(),
             ]);
         }
-
-        // 🔍 DEBUG
-        Log::info('DEBUG bet', [
-            'username'      => $username,
-            'product'       => $request->input('productId'),
-            'txn_count'     => count($txns),
-            'balanceBefore' => $balanceBefore,
-            'betAmount_AMB' => collect($txns)->sum(fn($t) => (float) ($t['betAmount'] ?? 0)),
-            'betAmount_OUR' => $balanceBefore - ($result['balance'] ?? $balanceBefore),
-            'balanceAfter'  => $result['balance'] ?? null,
-            'playInfo'      => collect($txns)->pluck('playInfo')->toArray(),
-        ]);
-
-                // 🔍 DEBUG
-        Log::info('DEBUG win', [
-            'username'       => $username,
-            'product'        => $request->input('productId'),
-            'txn_count'      => count($txns),
-            'balanceBefore'  => $balanceBefore,
-            'payoutAmount'   => collect($txns)->sum(fn($t) => (float) ($t['payoutAmount'] ?? 0)),
-            'balanceAfter'   => $result['balance'] ?? null,
-            'playInfo'       => collect($txns)->pluck('playInfo')->toArray(),
-        ]);
 
         $statusCode = ($result['status'] === 'success') ? 0 : 10001;
         $balanceAfter = (float) ($result['balance'] ?? ($user ? $this->walletService->getBalance($user) : 0));
@@ -313,18 +283,6 @@ class GameController extends Controller
                 'raw'        => $request->all(),
             ]);
         }
-
-        // 🔍 DEBUG
-        Log::info('DEBUG bet', [
-            'username'      => $username,
-            'product'       => $request->input('productId'),
-            'txn_count'     => count($txns),
-            'balanceBefore' => $balanceBefore,
-            'betAmount_AMB' => collect($txns)->sum(fn($t) => (float) ($t['betAmount'] ?? 0)),
-            'betAmount_OUR' => $balanceBefore - ($result['balance'] ?? $balanceBefore),
-            'balanceAfter'  => $result['balance'] ?? null,
-            'playInfo'      => collect($txns)->pluck('playInfo')->toArray(),
-        ]);
 
         $statusCode = ($result['status'] === 'success') ? 0 : 10001;
         $balanceAfter = (float) ($result['balance'] ?? ($user ? $this->walletService->getBalance($user) : 0));
