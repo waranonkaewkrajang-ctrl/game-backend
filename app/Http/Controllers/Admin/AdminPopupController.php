@@ -67,4 +67,22 @@ class AdminPopupController extends Controller
         $popup->update(['is_active' => !$popup->is_active]);
         return response()->json(['status' => 'success', 'data' => $popup->fresh()]);
     }
+
+    /** อัปโหลดรูป popup */
+    public function uploadImage(Request $request): JsonResponse
+    {
+        $request->validate([
+            'image' => 'required|file|mimes:jpg,jpeg,png,gif,webp,svg|max:5120',
+        ]);
+
+        $file = $request->file('image');
+        $filename = 'popup_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $file->getClientOriginalExtension();
+
+        $file->move(public_path('uploads/popups'), $filename);
+
+        return response()->json([
+            'status' => 'success',
+            'url'    => '/uploads/popups/' . $filename,
+        ]);
+    }
 }
