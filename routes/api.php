@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\BannerController;
 
 // API สำหรับฝั่งลูกค้า (ไม่ต้องล็อคอินแอดมินก็ดึงได้)
 Route::get('/banners', [BannerController::class, 'index']);
+Route::get('/popups', [\App\Http\Controllers\Api\PopupController::class, 'index']);
 
 Route::get('/maintenance/check', function () {
     $mode = \App\Models\Setting::where('key', 'maintenance_mode')->value('value');
@@ -482,6 +483,14 @@ Route::prefix('admin')->group(function () {
         Route::delete('/spin-wheel/prizes/{id}',   [\App\Http\Controllers\Admin\AdminSpinWheelController::class, 'destroyPrize']);
         Route::get('/spin-wheel/settings',         [\App\Http\Controllers\Admin\AdminSpinWheelController::class, 'settings']);
         Route::post('/spin-wheel/settings',        [\App\Http\Controllers\Admin\AdminSpinWheelController::class, 'updateSettings']);
+
+        // Popups
+        Route::get('/popups',                 [\App\Http\Controllers\Admin\AdminPopupController::class, 'index']);
+        Route::post('/popups',                [\App\Http\Controllers\Admin\AdminPopupController::class, 'store']);
+        Route::put('/popups/{popup}',         [\App\Http\Controllers\Admin\AdminPopupController::class, 'update']);
+        Route::delete('/popups/{popup}',      [\App\Http\Controllers\Admin\AdminPopupController::class, 'destroy']);
+        Route::post('/popups/{popup}/toggle', [\App\Http\Controllers\Admin\AdminPopupController::class, 'toggle']);
+        
         Route::get('/spin-wheel/history',          [\App\Http\Controllers\Admin\AdminSpinWheelController::class, 'history']);
         Route::get('/spin-wheel/summary',          [\App\Http\Controllers\Admin\AdminSpinWheelController::class, 'summary']);
         Route::get('/spin-wheel/multipliers',          [\App\Http\Controllers\Admin\AdminSpinWheelController::class, 'multipliers']);
