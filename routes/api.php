@@ -487,6 +487,7 @@ Route::prefix('admin')->group(function () {
         // Popups
         Route::get('/popups',                 [\App\Http\Controllers\Admin\AdminPopupController::class, 'index']);
         Route::post('/popups',                [\App\Http\Controllers\Admin\AdminPopupController::class, 'store']);
+        Route::post('/popups/upload-image',   [\App\Http\Controllers\Admin\AdminPopupController::class, 'uploadImage']);
         Route::put('/popups/{popup}',         [\App\Http\Controllers\Admin\AdminPopupController::class, 'update']);
         Route::delete('/popups/{popup}',      [\App\Http\Controllers\Admin\AdminPopupController::class, 'destroy']);
         Route::post('/popups/{popup}/toggle', [\App\Http\Controllers\Admin\AdminPopupController::class, 'toggle']);
