@@ -181,7 +181,7 @@ class AdminSpinWheelController extends Controller
     }
 
     // === จัดการตั๋ว ===
-
+    
     public function giveTickets(Request $request): JsonResponse
     {
         $data = $request->validate([

@@ -262,15 +262,22 @@ class GameController extends Controller
             $gameCode = $txn['gameCode'] ?? $request->input('gameCode');
 
             if ($isSingleState && $betAmount > 0) {
-                $this->callbackService->processBet([
-                    'username'   => $username,
-                    'txn_id'     => $txn['id'] ?? null,
-                    'round_id'   => $roundId,
-                    'game_id'    => $gameCode,
-                    'provider'   => $provider,
-                    'bet_amount' => $betAmount,
-                    'raw'        => $request->all(),
-                ]);
+                // ⚡ เช็คว่า round นี้มี bet แล้วหรือยัง (ป้องกันหักเงินซ้ำ)
+                $alreadyBet = \App\Models\GameLog::where('round_id', 'LIKE', $roundId . '%')
+                    ->where('action', 'bet')
+                    ->exists();
+
+                if (!$alreadyBet) {
+                    $this->callbackService->processBet([
+                        'username'   => $username,
+                        'txn_id'     => $txn['id'] ?? null,
+                        'round_id'   => $roundId,
+                        'game_id'    => $gameCode,
+                        'provider'   => $provider,
+                        'bet_amount' => $betAmount,
+                        'raw'        => $request->all(),
+                    ]);
+                }
             }
 
             $result = $this->callbackService->processWin([
