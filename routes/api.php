@@ -47,6 +47,7 @@ Route::prefix('game/callback')->group(function () {
     Route::post('/checkBalance', [GameController::class, 'getBalance']);
     Route::post('/placeBets',    [GameController::class, 'bet']);
     Route::post('/settleBets',   [GameController::class, 'win']);
+    Route::post('/winRewards',   [GameController::class, 'winRewards']);
 });
 
 
