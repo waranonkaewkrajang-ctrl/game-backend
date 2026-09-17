@@ -254,6 +254,21 @@ class GameController extends Controller
 
         $result = ['status' => 'success', 'balance' => $balanceBefore];
 
+        // 🆕 Log raw settleBets เพื่อ debug
+        Log::info('RAW settleBets', [
+            'productId' => $provider,
+            'username'  => $username,
+            'txn_count' => count($txns),
+            'txns'      => collect($txns)->map(fn($t) => [
+                'id' => $t['id'] ?? null,
+                'betAmount' => $t['betAmount'] ?? null,
+                'payoutAmount' => $t['payoutAmount'] ?? null,
+                'playInfo' => $t['playInfo'] ?? null,
+                'roundId' => $t['roundId'] ?? null,
+                'isSingleState' => $t['isSingleState'] ?? null,
+            ])->toArray(),
+        ]);
+
         foreach ($txns as $txn) {
             $isSingleState = (bool) ($txn['isSingleState'] ?? false);
             $betAmount = (float) ($txn['betAmount'] ?? 0);
