@@ -288,7 +288,9 @@ class GameController extends Controller
 
             if ($isSingleState && $betAmount > 0) {
                 // ⚡ เช็คว่า round นี้มี bet แล้วหรือยัง (ป้องกันหักเงินซ้ำ)
-                $alreadyBet = \App\Models\GameLog::where('round_id', 'LIKE', $roundId . '%')
+                $txnId = $txn['id'] ?? null;
+                $checkRoundId = $txnId ? $roundId . '|' . $txnId : $roundId;
+                $alreadyBet = \App\Models\GameLog::where('round_id', $checkRoundId)
                     ->where('action', 'bet')
                     ->exists();
 
