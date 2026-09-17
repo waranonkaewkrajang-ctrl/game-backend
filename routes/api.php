@@ -445,6 +445,12 @@ Route::prefix('admin')->group(function () {
             return response()->json(['data' => $query->paginate(50)]);
         });
 
+        // Rewards (ยอดเสีย / ค่าแนะนำ)
+        Route::get('/rewards/summary', [\App\Http\Controllers\Admin\AdminRewardController::class, 'summary']);
+        Route::get('/rewards/by-user', [\App\Http\Controllers\Admin\AdminRewardController::class, 'byUser']);
+        Route::get('/rewards/{id}',    [\App\Http\Controllers\Admin\AdminRewardController::class, 'show']);
+        Route::get('/rewards',         [\App\Http\Controllers\Admin\AdminRewardController::class, 'index']);
+
         // Game Logs (ประวัติเดิมพัน)
         Route::get('/game-logs', function (\Illuminate\Http\Request $request) {
             $query = \App\Models\GameLog::with('user')->orderBy('created_at', 'desc');
