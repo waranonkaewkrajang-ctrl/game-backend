@@ -180,7 +180,17 @@ class GameController extends Controller
             ]);
         }
 
-        $txns = $request->input('txns', []);
+                $txns = $request->input('txns', []);
+
+        // ⚡ SAGAME ส่ง betAmount มา 2 เท่า — ใช้ค่าจริงจาก playInfo
+        if ($request->input('productId') === 'SAGAME') {
+            foreach ($txns as &$txn) {
+                if (isset($txn['playInfo']) && preg_match('/-(\d+(?:\.\d+)?)$/', $txn['playInfo'], $m)) {
+                    $txn['betAmount'] = (float) $m[1];
+                }
+            }
+            unset($txn);
+        }
 
         // 🆕 Log raw request เพื่อพิสูจน์
         Log::info('RAW placeBets', [
