@@ -324,6 +324,75 @@ class GameController extends Controller
     }
 
     // =====================================================
+    //  WIN REWARDS CALLBACK (แจ็คพอต / โบนัสจากค่ายเกม)
+    // =====================================================
+    public function winRewards(Request $request): JsonResponse
+    {
+        $username = $request->input('username');
+
+        // 🔒 Validate username
+        if (empty($username) || !is_string($username)) {
+            Log::warning('Callback winRewards: username missing', $request->all());
+            return response()->json([
+                'id'              => $request->input('id', uniqid()),
+                'statusCode'      => 10002,
+                'timestampMillis' => (int) round(microtime(true) * 1000),
+                'productId'       => $request->input('productId', ''),
+                'currency'        => $request->input('currency', 'THB'),
+                'balanceBefore'   => 0,
+                'balanceAfter'    => 0,
+                'username'        => '',
+            ]);
+        }
+
+        $txns = $request->input('txns', []);
+
+        $user = \App\Models\User::where('amb_username', $username)->first();
+        $balanceBefore = $user ? $this->walletService->getBalance($user) : 0;
+        $provider = $request->input('productId', 'AMB');
+
+        $result = ['status' => 'success', 'balance' => $balanceBefore];
+
+        Log::info('RAW winRewards', [
+            'productId' => $provider,
+            'username'  => $username,
+            'txn_count' => count($txns),
+            'txns'      => $txns,
+        ]);
+
+        foreach ($txns as $txn) {
+            $roundId  = $txn['roundId'] ?? $request->input('roundId');
+            $gameCode = $txn['gameCode'] ?? $request->input('gameCode');
+
+            // payoutAmount ของ winRewards = เงินรางวัลล้วน (ไม่รวมทุน)
+            // ต่อ _reward กัน round_id ชนกับ settleBets รอบเดียวกัน
+            $result = $this->callbackService->processWin([
+                'username'   => $username,
+                'txn_id'     => $txn['id'] ?? null,
+                'round_id'   => $roundId . '_reward',
+                'game_id'    => $gameCode,
+                'provider'   => $provider,
+                'win_amount' => (float) ($txn['payoutAmount'] ?? 0),
+                'raw'        => $request->all(),
+            ]);
+        }
+
+        $statusCode = ($result['status'] === 'success') ? 0 : 10001;
+        $balanceAfter = (float) ($result['balance'] ?? ($user ? $this->walletService->getBalance($user) : 0));
+
+        return response()->json([
+            'id'              => $request->input('id', uniqid()),
+            'statusCode'      => $statusCode,
+            'timestampMillis' => (int) round(microtime(true) * 1000),
+            'productId'       => $request->input('productId', ''),
+            'currency'        => $request->input('currency', 'THB'),
+            'balanceBefore'   => (float) $balanceBefore,
+            'balanceAfter'    => (float) $balanceAfter,
+            'username'        => $username,
+        ]);
+    }
+
+    // =====================================================
     //  ดูเครดิต Agent
     // =====================================================
     public function agentCredit(): JsonResponse
