@@ -354,7 +354,122 @@ Route::prefix('admin')->group(function () {
             return response()->json(['status' => 'success', 'message' => 'รีเซ็ตรหัสผ่านสำเร็จ']);
         });
 
+        // Turnover (เทิร์นโอเวอร์)
+        Route::get('/users/{user}/turnover', [\App\Http\Controllers\Admin\AdminUserController::class, 'turnover']);
+        Route::post('/users/{user}/turnover/{claim}/cancel', [\App\Http\Controllers\Admin\AdminUserController::class, 'cancelTurnover']);
+
         // Transactions
+    }
+
+    /**
+     * ดูเทิร์นโอเวอร์ของลูกค้า + แยกตามเกมที่เล่น
+     */
+    public function turnover(User $user): JsonResponse
+    {
+        $claims = $user->promotionClaims()
+            ->orderByRaw("FIELD(status,'active','completed','cancelled','expired')")
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(fn ($c) => [
+                'id'                  => $c->id,
+                'type'                => $c->type,
+                'bonus_amount'        => (float) $c->bonus_amount,
+                'turnover_multiplier' => (float) $c->turnover_multiplier,
+                'turnover_required'   => (float) $c->turnover_required,
+                'turnover_current'    => (float) $c->turnover_current,
+                'remaining'           => (float) $c->remaining,
+                'progress_percent'    => $c->progress_percent,
+                'status'              => $c->status,
+                'is_expired'          => $c->isExpired(),
+                'note'                => $c->note,
+                'expired_at'          => $c->expired_at?->toIso8601String(),
+                'created_at'          => $c->created_at->toIso8601String(),
+            ]);
+
+        // เกมที่เล่นตั้งแต่ได้โบนัสที่ยังค้างอยู่ (นับเฉพาะยอดลงเดิมพัน)
+        $activeSince = $user->promotionClaims()->active()->min('created_at');
+
+        $games = collect();
+        if ($activeSince) {
+            $games = \App\Models\GameLog::where('user_id', $user->id)
+                ->where('action', 'bet')
+                ->where('created_at', '>=', $activeSince)
+                ->select(
+                    'provider',
+                    'game_id',
+                    \DB::raw('COUNT(*) as rounds'),
+                    \DB::raw('SUM(bet_amount) as total_bet'),
+                    \DB::raw('MAX(created_at) as last_played')
+                )
+                ->groupBy('provider', 'game_id')
+                ->orderByDesc('total_bet')
+                ->get();
+        }
+
+        // รวมยอดต่อค่าย
+        $byProvider = $games->groupBy('provider')->map(fn ($g, $p) => [
+            'provider'   => $p,
+            'total_bet'  => (float) $g->sum('total_bet'),
+            'rounds'     => (int) $g->sum('rounds'),
+            'game_count' => $g->count(),
+        ])->sortByDesc('total_bet')->values();
+
+        $check = $this->walletService->checkTurnover($user);
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => [
+                'has_active'      => $check['has_active'],
+                'total_remaining' => $check['total_remaining'],
+                'can_withdraw'    => !$check['has_active'],
+                'active_since'    => $activeSince,
+                'bet_total'       => (float) $games->sum('total_bet'),
+                'claims'          => $claims,
+                'by_provider'     => $byProvider,
+                'games'           => $games,
+            ],
+        ]);
+    }
+
+    /**
+     * ยกเลิกเทิร์น + ยกเลิกโบนัส (ไม่หักเครดิตออกจาก wallet)
+     */
+    public function cancelTurnover(Request $request, User $user, \App\Models\PromotionClaim $claim): JsonResponse
+    {
+        if ($claim->user_id !== $user->id) {
+            return response()->json(['status' => 'error', 'message' => 'ไม่พบรายการเทิร์นของลูกค้ารายนี้'], 404);
+        }
+
+        if ($claim->status !== 'active') {
+            return response()->json(['status' => 'error', 'message' => 'รายการนี้ไม่ได้อยู่ในสถานะ active'], 400);
+        }
+
+        $admin  = $request->user();
+        $reason = $request->input('reason');
+
+        $claim->update([
+            'status'       => 'cancelled',
+            'completed_at' => now(),
+            'note'         => trim(($claim->note ? $claim->note . "\n" : '')
+                . "ยกเลิกโดย {$admin->name}" . ($reason ? " — {$reason}" : '')),
+        ]);
+
+        \Log::info('Turnover cancelled by admin', [
+            'claim_id' => $claim->id,
+            'user_id'  => $user->id,
+            'admin'    => $admin->name,
+            'reason'   => $reason,
+        ]);
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'ยกเลิกเทิร์นและโบนัสสำเร็จ ลูกค้าถอนได้แล้ว (ไม่ได้หักเครดิต)',
+            'data'    => $claim->fresh(),
+        ]);
+    }
+
+    public function update(Request $request, User $user): JsonResponse
+    {
         Route::get('/transactions', function (\Illuminate\Http\Request $request) {
             $query = \DB::table('transactions')
                 ->join('users', 'transactions.user_id', '=', 'users.id')
