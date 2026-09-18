@@ -112,14 +112,65 @@ class AdminUserController extends Controller
      */
     public function turnover(User $user): JsonResponse
     {
+        // ดึง transaction โบนัสของ user มาจับคู่หาที่มาของโบนัส
+        $bonusTxns = \App\Models\Transaction::where('user_id', $user->id)
+            ->where('type', 'bonus')
+            ->orderBy('created_at', 'desc')
+            ->get(['description', 'meta', 'created_at', 'amount']);
+
+        $sourceLabels = [
+            'claim_cashback'  => 'รับยอดเสีย (Cashback)',
+            'claim_referral'  => 'รับค่าแนะนำเพื่อน',
+            'deposit_bonus'   => 'โบนัสฝากเงิน',
+            'welcome_bonus'   => 'โบนัสสมาชิกใหม่',
+            'spin_reward'     => 'รางวัลกงล้อ',
+            'manual'          => 'แอดมินเติมให้',
+        ];
+
         $claims = $user->promotionClaims()
+            ->with('promotion:id,title,type,bonus_percent,min_deposit')
             ->orderByRaw("FIELD(status,'active','completed','cancelled','expired')")
             ->orderBy('created_at', 'desc')
             ->get()
-            ->map(fn ($c) => [
-                'id'                  => $c->id,
-                'type'                => $c->type,
-                'bonus_amount'        => (float) $c->bonus_amount,
+            ->map(function ($c) use ($bonusTxns, $sourceLabels) {
+                // หา transaction ที่เวลาใกล้เคียงที่สุด (ภายใน 5 วินาที)
+                $txn = $bonusTxns->first(fn ($t) =>
+                    abs($t->created_at->diffInSeconds($c->created_at)) <= 5
+                );
+
+                $metaType = $txn?->meta['type'] ?? null;
+                $source   = $sourceLabels[$metaType] ?? null;
+
+                // ลำดับความชัดเจน: โปรโมชันจริง > meta.type > description > type ดิบ
+                if ($c->promotion) {
+                    $sourceName = $c->promotion->title;
+                } elseif ($source) {
+                    $sourceName = $source;
+                } elseif ($txn?->description) {
+                    $sourceName = $txn->description;
+                } else {
+                    $sourceName = $sourceLabels[$c->type] ?? $c->type;
+                }
+
+                return [
+                    'id'                  => $c->id,
+                    'type'                => $c->type,
+                    'source_name'         => $sourceName,
+                    'source_detail'       => $txn?->description,
+                    'promotion_title'     => $c->promotion?->title,
+                    'bonus_amount'        => (float) $c->bonus_amount,
+                    'turnover_multiplier' => (float) $c->turnover_multiplier,
+                    'turnover_required'   => (float) $c->turnover_required,
+                    'turnover_current'    => (float) $c->turnover_current,
+                    'remaining'           => (float) $c->remaining,
+                    'progress_percent'    => $c->progress_percent,
+                    'status'              => $c->status,
+                    'is_expired'          => $c->isExpired(),
+                    'note'                => $c->note,
+                    'expired_at'          => $c->expired_at?->toIso8601String(),
+                    'created_at'          => $c->created_at->toIso8601String(),
+                ];
+            });
                 'turnover_multiplier' => (float) $c->turnover_multiplier,
                 'turnover_required'   => (float) $c->turnover_required,
                 'turnover_current'    => (float) $c->turnover_current,
@@ -149,6 +200,7 @@ class AdminUserController extends Controller
                 )
                 ->groupBy('provider', 'game_id')
                 ->orderByDesc('total_bet')
+                ->limit(50)
                 ->get();
         }
 
@@ -160,14 +212,16 @@ class AdminUserController extends Controller
             'game_count' => $g->count(),
         ])->sortByDesc('total_bet')->values();
 
-        $check = $this->walletService->checkTurnover($user);
+        // อ่านอย่างเดียว ไม่ auto-expire (ต่างจาก checkTurnover ที่ใช้ตอนถอน)
+        $activeClaims = $user->promotionClaims()->active()->get()
+            ->reject(fn ($c) => $c->isExpired());
 
         return response()->json([
             'status' => 'success',
             'data'   => [
-                'has_active'      => $check['has_active'],
-                'total_remaining' => $check['total_remaining'],
-                'can_withdraw'    => !$check['has_active'],
+                'has_active'      => $activeClaims->isNotEmpty(),
+                'total_remaining' => (float) $activeClaims->sum(fn ($c) => $c->remaining),
+                'can_withdraw'    => $activeClaims->isEmpty(),
                 'active_since'    => $activeSince,
                 'bet_total'       => (float) $games->sum('total_bet'),
                 'claims'          => $claims,
