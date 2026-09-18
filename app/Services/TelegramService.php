@@ -8,10 +8,11 @@ use Illuminate\Support\Facades\Log;
 
 class TelegramService
 {
-    public function send(string $message): bool
+    public function send(string $message, ?string $chatId = null): bool
     {
         $token = Setting::getValue('telegram_bot_token');
-        $chatId = Setting::getValue('telegram_chat_id');
+        // ถ้าไม่ระบุกลุ่ม → ใช้กลุ่มหลัก (เดิม)
+        $chatId = $chatId ?: Setting::getValue('telegram_chat_id');
 
         if (!$token || !$chatId) return false;
 
@@ -28,7 +29,17 @@ class TelegramService
         }
     }
 
+    /**
+     * อ่าน chat_id ของแต่ละประเภท — ถ้าไม่ได้ตั้ง จะ fallback ไปกลุ่มหลัก
+     */
+    private function chatFor(string $type): ?string
+    {
+        $chatId = Setting::getValue("telegram_chat_id_{$type}");
+        return $chatId ?: null;   // null = ใช้กลุ่มหลัก
+    }
+
     public function sendTest(string $token, string $chatId): bool
+
     {
         try {
             $res = Http::post("https://api.telegram.org/bot{$token}/sendMessage", [
@@ -89,12 +100,19 @@ class TelegramService
     public function notifyWithdraw(string $username, float $amount): void
     {
         if (Setting::getValue('telegram_notify_withdraw') !== 'true') return;
-        $this->send("💸 <b>แจ้งถอนเงิน</b>\nUser: {$username}\nจำนวน: ฿" . number_format($amount, 2));
+        $this->send(
+            "💸 <b>แจ้งถอนเงิน</b>\nUser: {$username}\nจำนวน: ฿" . number_format($amount, 2),
+            $this->chatFor('withdraw')
+        );
     }
 
     public function notifyRegister(string $username, string $phone): void
     {
         if (Setting::getValue('telegram_notify_register') !== 'true') return;
-        $this->send("👤 <b>สมาชิกใหม่</b>\nUser: {$username}\nเบอร์: {$phone}");
+        $this->send(
+            "👤 <b>สมาชิกใหม่</b>\nUser: {$username}\nเบอร์: {$phone}",
+            $this->chatFor('register')
+        );
     }
+
 }
