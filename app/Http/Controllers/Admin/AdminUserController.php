@@ -171,17 +171,7 @@ class AdminUserController extends Controller
                     'created_at'          => $c->created_at->toIso8601String(),
                 ];
             });
-                'turnover_multiplier' => (float) $c->turnover_multiplier,
-                'turnover_required'   => (float) $c->turnover_required,
-                'turnover_current'    => (float) $c->turnover_current,
-                'remaining'           => (float) $c->remaining,
-                'progress_percent'    => $c->progress_percent,
-                'status'              => $c->status,
-                'is_expired'          => $c->isExpired(),
-                'note'                => $c->note,
-                'expired_at'          => $c->expired_at?->toIso8601String(),
-                'created_at'          => $c->created_at->toIso8601String(),
-            ]);
+            
 
         // เกมที่เล่นตั้งแต่ได้โบนัสที่ยังค้างอยู่ (นับเฉพาะยอดลงเดิมพัน)
         $activeSince = $user->promotionClaims()->active()->min('created_at');
