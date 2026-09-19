@@ -6,6 +6,7 @@ use App\Models\Setting;
 use App\Models\User;
 use App\Models\GameLog;
 use App\Models\Reward;
+use App\Models\Transaction;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
@@ -55,8 +56,16 @@ class CalculateCashback extends Command
             $totalWin = GameLog::where('user_id', $user->id)
                 ->where('action', 'win')->whereDate('created_at', $date)->sum('win_amount');
 
-            // ยอดเสีย = bet - win (ถ้าติดลบ = ได้กำไร ไม่ต้องจ่าย)
-            $loss = $totalBet - $totalWin;
+            // เงินโบนัสที่รับวันนั้น (ยอดเสีย/ค่าแนะนำ/เครดิตฟรี/กงล้อ)
+            // ไม่นับเป็นยอดเสีย เพราะไม่ใช่เงินฝากของลูกค้า
+            $bonusReceived = (float) Transaction::where('user_id', $user->id)
+                ->where('type', 'bonus')
+                ->whereDate('created_at', $date)
+                ->sum('amount');
+
+            // ยอดเสียที่ได้คืน = (เดิมพัน − ชนะ) − โบนัสที่รับวันนั้น
+            $rawLoss = $totalBet - $totalWin;
+            $loss    = round($rawLoss - $bonusReceived, 2);
 
             if ($loss <= 0) continue;
 
@@ -73,11 +82,14 @@ class CalculateCashback extends Command
                             'status'      => 'pending',
                             'description' => "คืนยอดเสีย {$cashbackPercent}% วันที่ {$date->toDateString()} (เสีย {$loss})",
                             'meta'        => [
-                                'date'    => $date->toDateString(),
-                                'loss'    => $loss,
-                                'percent' => $cashbackPercent,
-                                'bet'     => $totalBet,
-                                'win'     => $totalWin,
+                                'date'           => $date->toDateString(),
+                                'loss'           => $loss,
+                                'raw_loss'       => $rawLoss,
+                                'bonus_received' => $bonusReceived,
+                                'percent'        => $cashbackPercent,
+                                'bet'            => $totalBet,
+                                'win'            => $totalWin,
+
                             ],
                         ]);
                         $cashbackTotal += $cashback;
@@ -108,8 +120,10 @@ class CalculateCashback extends Command
                                     'date'          => $date->toDateString(),
                                     'from_user_id'  => $user->id,
                                     'from_username' => $user->username,
-                                    'loss'          => $loss,
-                                    'percent'       => $referralPercent,
+                                    'loss'           => $loss,
+                                    'raw_loss'       => $rawLoss,
+                                    'bonus_received' => $bonusReceived,
+                                    'percent'        => $referralPercent,
                                     'bet'           => $totalBet,
                                     'win'           => $totalWin,
                                 ],
