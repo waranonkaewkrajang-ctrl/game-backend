@@ -84,9 +84,9 @@ class RewardController extends Controller
                 ->where('status', 'pending')
                 ->lockForUpdate();
 
-            // ถ้าตั้งวันหมดอายุ → รับได้เฉพาะที่ยังไม่หมดอายุ
+            // ถ้าตั้งวันหมดอายุ → รับได้เฉพาะที่ยังไม่หมดอายุ (หมดเที่ยงคืน)
             if ($expireDays > 0) {
-                $query->where('created_at', '>=', Carbon::now()->subDays($expireDays));
+                $query->where('created_at', '>=', Carbon::today()->subDays($expireDays - 1));
             }
 
             $pendingRewards = $query->get();
@@ -129,7 +129,7 @@ class RewardController extends Controller
             ->where('status', 'pending');
 
         if ($expireDays > 0) {
-            $query->where('created_at', '>=', Carbon::now()->subDays($expireDays));
+            $query->where('created_at', '>=', Carbon::today()->subDays($expireDays - 1));
         }
 
         return (float) $query->sum('amount');

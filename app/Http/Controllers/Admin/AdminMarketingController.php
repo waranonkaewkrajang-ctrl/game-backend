@@ -37,7 +37,7 @@ class AdminMarketingController extends Controller
                 DB::raw('COALESCE(wallets.total_deposit, 0) as total_deposit'),
                 DB::raw('COALESCE(wallets.total_withdraw, 0) as total_withdraw'),
                 DB::raw('COALESCE(wallets.total_deposit, 0) - COALESCE(wallets.total_withdraw, 0) as profit'),
-                DB::raw('CASE WHEN users.last_login_at IS NULL THEN 9999 ELSE DATEDIFF(NOW(), users.last_login_at) END as days_inactive')
+                DB::raw("CASE WHEN users.last_login_at IS NULL THEN 9999 ELSE DATEDIFF('" . now()->toDateTimeString() . "', users.last_login_at) END as days_inactive")
             );
 
         if ($search) {
@@ -91,7 +91,7 @@ class AdminMarketingController extends Controller
                 DB::raw('COALESCE(wallets.total_deposit, 0) as total_deposit'),
                 DB::raw('COALESCE(wallets.total_withdraw, 0) as total_withdraw'),
                 DB::raw('COALESCE(wallets.total_deposit, 0) - COALESCE(wallets.total_withdraw, 0) as profit'),
-                DB::raw('CASE WHEN users.last_login_at IS NULL THEN 9999 ELSE DATEDIFF(NOW(), users.last_login_at) END as days_inactive')
+                DB::raw("CASE WHEN users.last_login_at IS NULL THEN 9999 ELSE DATEDIFF('" . now()->toDateTimeString() . "', users.last_login_at) END as days_inactive")
             );
 
         if ($minDaysInactive > 0) $query->havingRaw('days_inactive >= ?', [$minDaysInactive]);
