@@ -253,8 +253,8 @@ class AdminUserController extends Controller
             return [
                 'provider'    => $l->provider,
                 'game_id'     => $l->game_id,
-                'game_name'   => $g->game_name_th ?: $g->game_name ?? $l->game_id,
-                'image_url'   => $g->image_url ?? null,
+                'game_name'   => $g?->game_name_th ?: ($g?->game_name ?: $l->game_id),
+                'image_url'   => $g?->image_url,
                 'rounds'      => (int) $l->rounds,
                 'total_bet'   => (float) $l->total_bet,
                 'last_played' => $l->last_played,
