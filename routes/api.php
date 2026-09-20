@@ -357,6 +357,7 @@ Route::prefix('admin')->group(function () {
          // Turnover (เทิร์นโอเวอร์)
         Route::get('/users/{user}/turnover', [\App\Http\Controllers\Admin\AdminUserController::class, 'turnover']);
         Route::post('/users/{user}/turnover/{claim}/cancel', [\App\Http\Controllers\Admin\AdminUserController::class, 'cancelTurnover']);
+        Route::get('/users/{user}/top-games', [\App\Http\Controllers\Admin\AdminUserController::class, 'topGames']);
 
         // Transactions
         Route::get('/transactions', function (\Illuminate\Http\Request $request) {

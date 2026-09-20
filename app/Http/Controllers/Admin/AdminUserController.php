@@ -221,6 +221,56 @@ class AdminUserController extends Controller
         ]);
     }
 
+        /**
+     * เกมที่ลูกค้าเล่นบ่อย (Top N) พร้อมรูปและชื่อเกม
+     */
+    public function topGames(Request $request, User $user): JsonResponse
+    {
+        $limit = min((int) $request->input('limit', 10), 50);
+        $sort  = $request->input('sort') === 'bet' ? 'total_bet' : 'rounds';
+
+        $logs = \App\Models\GameLog::where('user_id', $user->id)
+            ->where('action', 'bet')
+            ->select(
+                'provider',
+                'game_id',
+                \DB::raw('COUNT(*) as rounds'),
+                \DB::raw('SUM(bet_amount) as total_bet'),
+                \DB::raw('MAX(created_at) as last_played')
+            )
+            ->groupBy('provider', 'game_id')
+            ->orderByDesc($sort)
+            ->limit($limit)
+            ->get();
+
+        // ดึงชื่อ + รูปเกมมาเติม
+        $games = \App\Models\Game::whereIn('game_code', $logs->pluck('game_id'))
+            ->get(['product_id', 'game_code', 'game_name', 'game_name_th', 'image_url'])
+            ->keyBy(fn ($g) => $g->product_id . '|' . $g->game_code);
+
+        $data = $logs->map(function ($l) use ($games) {
+            $g = $games->get($l->provider . '|' . $l->game_id);
+            return [
+                'provider'    => $l->provider,
+                'game_id'     => $l->game_id,
+                'game_name'   => $g->game_name_th ?: $g->game_name ?? $l->game_id,
+                'image_url'   => $g->image_url ?? null,
+                'rounds'      => (int) $l->rounds,
+                'total_bet'   => (float) $l->total_bet,
+                'last_played' => $l->last_played,
+            ];
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => [
+                'games'        => $data,
+                'total_rounds' => (int) $logs->sum('rounds'),
+                'total_bet'    => (float) $logs->sum('total_bet'),
+            ],
+        ]);
+    }
+
     /**
      * ยกเลิกเทิร์น + ยกเลิกโบนัส (ไม่หักเครดิตออกจาก wallet)
      */
