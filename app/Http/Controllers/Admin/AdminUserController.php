@@ -222,6 +222,66 @@ class AdminUserController extends Controller
     }
 
         /**
+     * ช่วงเวลาที่ลูกค้าเล่นเกม (heatmap 7 วัน x 24 ชม.)
+     */
+    public function playHeatmap(Request $request, User $user): JsonResponse
+    {
+        $days = min((int) $request->input('days', 90), 365);
+        $since = now()->subDays($days)->startOfDay();
+
+        $rows = \App\Models\GameLog::where('user_id', $user->id)
+            ->where('action', 'bet')
+            ->where('created_at', '>=', $since)
+            ->select(
+                \DB::raw('DAYOFWEEK(created_at) as dow'),   // 1=อาทิตย์ ... 7=เสาร์
+                \DB::raw('HOUR(created_at) as hr'),
+                \DB::raw('COUNT(*) as rounds'),
+                \DB::raw('SUM(bet_amount) as total_bet')
+            )
+            ->groupBy('dow', 'hr')
+            ->get();
+
+        // สร้างตาราง 7x24 เติม 0 ให้ช่องที่ไม่มีข้อมูล
+        $grid = [];
+        for ($d = 1; $d <= 7; $d++) {
+            for ($h = 0; $h <= 23; $h++) {
+                $grid[$d][$h] = ['rounds' => 0, 'total_bet' => 0.0];
+            }
+        }
+
+        $maxRounds = 0;
+        foreach ($rows as $r) {
+            $grid[$r->dow][$r->hr] = [
+                'rounds'    => (int) $r->rounds,
+                'total_bet' => (float) $r->total_bet,
+            ];
+            $maxRounds = max($maxRounds, (int) $r->rounds);
+        }
+
+        $first = \App\Models\GameLog::where('user_id', $user->id)
+            ->where('action', 'bet')
+            ->where('created_at', '>=', $since)
+            ->min('created_at');
+
+        $last = \App\Models\GameLog::where('user_id', $user->id)
+            ->where('action', 'bet')
+            ->max('created_at');
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => [
+                'grid'         => $grid,
+                'max_rounds'   => $maxRounds,
+                'total_rounds' => (int) $rows->sum('rounds'),
+                'total_bet'    => (float) $rows->sum('total_bet'),
+                'first_played' => $first,
+                'last_played'  => $last,
+                'days'         => $days,
+            ],
+        ]);
+    }
+
+        /**
      * เกมที่ลูกค้าเล่นบ่อย (Top N) พร้อมรูปและชื่อเกม
      */
     public function topGames(Request $request, User $user): JsonResponse
