@@ -246,7 +246,7 @@ class TrueWalletWebhookController extends Controller
             \Illuminate\Support\Facades\DB::table('unmatched_deposits')->insert([
                 'bank'         => 'TRUEWALLET',
                 'amount'       => $amount,
-                'from_account' => trim(($data['sender_name'] ?? 'ไม่ทราบชื่อ') . ' ' . $phone),
+                'from_account' => $this->formatSender($data, $phone),
                 'tx_time'      => now('Asia/Bangkok')->format('d/m/Y H:i'),
                 'status'       => 'pending',
                 'note'         => $reason,
@@ -261,5 +261,27 @@ class TrueWalletWebhookController extends Controller
         } catch (\Throwable $e) {
             Log::error('TrueWallet saveToUnmatched failed', ['error' => $e->getMessage()]);
         }
+    }
+
+    /**
+     * สร้างข้อความผู้โอนจาก payload ของ TrueWallet
+     * P2P          → "[P2P] ศศธร เลี*** 0656629592"
+     * DIRECT_TOPUP → "[DIRECT_TOPUP] Kasikorn Bank"
+     */
+    private function formatSender(array $data, string $phone): string
+    {
+        $type    = trim($data['event_type'] ?? '');
+        $name    = trim($data['sender_name'] ?? '');
+        $channel = trim($data['channel'] ?? '');
+
+        if ($name !== '') {
+            return trim("[{$type}] " . trim($name . ' ' . $phone));
+        }
+
+        if ($channel !== '') {
+            return "[{$type}] {$channel}";
+        }
+
+        return $type !== '' ? "[{$type}]" : 'ไม่ระบุ';
     }
 }
