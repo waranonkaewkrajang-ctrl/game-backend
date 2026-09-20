@@ -358,6 +358,7 @@ Route::prefix('admin')->group(function () {
         Route::get('/users/{user}/turnover', [\App\Http\Controllers\Admin\AdminUserController::class, 'turnover']);
         Route::post('/users/{user}/turnover/{claim}/cancel', [\App\Http\Controllers\Admin\AdminUserController::class, 'cancelTurnover']);
         Route::get('/users/{user}/top-games', [\App\Http\Controllers\Admin\AdminUserController::class, 'topGames']);
+        Route::get('/users/{user}/play-heatmap', [\App\Http\Controllers\Admin\AdminUserController::class, 'playHeatmap']);
 
         // Transactions
         Route::get('/transactions', function (\Illuminate\Http\Request $request) {
