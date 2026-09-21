@@ -22,7 +22,11 @@ class ThemeService
         'radius'        => 8,
         'btn_depth'     => 0,
         'glow'          => 40,
+        'font'          => 'Inter',   // ค่าเดิมของเว็บ
+        'font_scale'    => 100,       // ขนาดตัวอักษร % (100 = ปกติ)
     ];
+
+    public const FONTS = ['Inter', 'Kanit', 'Prompt', 'Chakra Petch', 'Mitr', 'Bai Jamjuree', 'Sarabun', 'Noto Sans Thai'];
 
     public function get(): array
     {
