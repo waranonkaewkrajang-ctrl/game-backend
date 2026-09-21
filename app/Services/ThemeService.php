@@ -24,6 +24,21 @@ class ThemeService
         'glow'          => 40,
         'font'          => 'Inter',   // ค่าเดิมของเว็บ
         'font_scale'    => 100,       // ขนาดตัวอักษร % (100 = ปกติ)
+
+        // ── วงล้อ (ค่าเริ่มต้น = หน้าตาเดิม) ──
+        'wheel_slice_mode'    => 'theme',    // theme = สลับ 2 สี, prize = ใช้สีรายรางวัล
+        'wheel_slice_a'       => '#7c3aed',
+        'wheel_slice_b'       => '#5b21b6',
+        'wheel_ring'          => '#2d1b69',
+        'wheel_ring_border'   => '#7c3aed',
+        'wheel_glow'          => '#8b5cf6',
+        'wheel_dot_a'         => '#fbbf24',
+        'wheel_dot_b'         => '#ec4899',
+        'wheel_inner_ring'    => '#38bdf8',
+        'wheel_center'        => '#4c1d95',
+        'wheel_center_border' => '#a78bfa',
+        'wheel_text'          => '#e9d5ff',
+        'wheel_center_text'   => 'SPIN',
     ];
 
     public const FONTS = ['Inter', 'Kanit', 'Prompt', 'Chakra Petch', 'Mitr', 'Bai Jamjuree', 'Sarabun', 'Noto Sans Thai'];

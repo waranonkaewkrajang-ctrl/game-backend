@@ -48,6 +48,20 @@ class AdminThemeController extends Controller
             'glow'          => 'nullable|integer|min:0|max:100',
             'font'          => ['nullable', 'string', \Illuminate\Validation\Rule::in(ThemeService::FONTS)],
             'font_scale'    => 'nullable|integer|min:85|max:125',
+
+            'wheel_slice_mode'    => 'nullable|in:theme,prize',
+            'wheel_slice_a'       => $color,
+            'wheel_slice_b'       => $color,
+            'wheel_ring'          => $color,
+            'wheel_ring_border'   => $color,
+            'wheel_glow'          => $color,
+            'wheel_dot_a'         => $color,
+            'wheel_dot_b'         => $color,
+            'wheel_inner_ring'    => $color,
+            'wheel_center'        => $color,
+            'wheel_center_border' => $color,
+            'wheel_text'          => $color,
+            'wheel_center_text'   => 'nullable|string|max:8',
         ]);
 
         $data = array_filter($data, fn ($v) => $v !== null);
