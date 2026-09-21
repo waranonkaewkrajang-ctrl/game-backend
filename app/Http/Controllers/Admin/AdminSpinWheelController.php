@@ -58,6 +58,30 @@ class AdminSpinWheelController extends Controller
         return response()->json(['status' => 'success', 'data' => $prize]);
     }
 
+        /**
+     * อัปโหลดภาพรางวัลวงล้อ — คืน URL เต็ม (ใช้ได้ทั้งหน้า admin และหน้าลูกค้าคนละโดเมน)
+     */
+    public function uploadImage(Request $request): JsonResponse
+    {
+        $request->validate([
+            'image' => 'required|file|mimes:jpg,jpeg,png,gif,webp|max:2048',
+        ]);
+
+        $file = $request->file('image');
+        $dir  = public_path('uploads/spin-wheel');
+        if (!is_dir($dir)) mkdir($dir, 0755, true);
+
+        $filename = 'prize_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . strtolower($file->getClientOriginalExtension());
+        $file->move($dir, $filename);
+
+        $base = rtrim(config('app.url'), '/');
+
+        return response()->json([
+            'status' => 'success',
+            'url'    => $base . '/uploads/spin-wheel/' . $filename,
+        ]);
+    }
+
     public function destroyPrize(int $id): JsonResponse
     {
         SpinWheelPrize::findOrFail($id)->delete();

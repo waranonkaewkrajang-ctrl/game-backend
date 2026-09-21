@@ -499,6 +499,7 @@ Route::prefix('admin')->group(function () {
         Route::post('/spin-wheel/prizes',          [\App\Http\Controllers\Admin\AdminSpinWheelController::class, 'storePrize']);
         Route::put('/spin-wheel/prizes/{id}',      [\App\Http\Controllers\Admin\AdminSpinWheelController::class, 'updatePrize']);
         Route::delete('/spin-wheel/prizes/{id}',   [\App\Http\Controllers\Admin\AdminSpinWheelController::class, 'destroyPrize']);
+        Route::post('/spin-wheel/upload-image',    [\App\Http\Controllers\Admin\AdminSpinWheelController::class, 'uploadImage']);
         Route::get('/spin-wheel/settings',         [\App\Http\Controllers\Admin\AdminSpinWheelController::class, 'settings']);
         Route::post('/spin-wheel/settings',        [\App\Http\Controllers\Admin\AdminSpinWheelController::class, 'updateSettings']);
 
