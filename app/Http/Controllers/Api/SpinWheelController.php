@@ -21,7 +21,7 @@ class SpinWheelController extends Controller
 
         $prizes = SpinWheelPrize::where('is_active', true)
             ->orderBy('sort_order')
-            ->get(['id', 'label', 'type', 'value', 'color', 'icon', 'image_url', 'sort_order']);
+            ->get(['id', 'label', 'type', 'value', 'color', 'icon', 'image_url', 'img_scale', 'img_x', 'img_y', 'img_rotate', 'sort_order']);
 
         $multipliers = SpinWheelMultiplier::where('is_active', true)
             ->orderBy('sort_order')
