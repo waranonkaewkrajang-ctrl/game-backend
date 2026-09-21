@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\BannerController;
 // API สำหรับฝั่งลูกค้า (ไม่ต้องล็อคอินแอดมินก็ดึงได้)
 Route::get('/banners', [BannerController::class, 'index']);
 Route::get('/popups', [\App\Http\Controllers\Api\PopupController::class, 'index']);
+Route::get('/site/theme', [\App\Http\Controllers\Admin\AdminThemeController::class, 'publicShow']);
 
 Route::get('/maintenance/check', function () {
     $mode = \App\Models\Setting::where('key', 'maintenance_mode')->value('value');
@@ -450,6 +451,10 @@ Route::prefix('admin')->group(function () {
             }
             return response()->json(['data' => $query->paginate(50)]);
         });
+
+        // Theme (ธีมหน้าเว็บลูกค้า)
+        Route::get('/theme', [\App\Http\Controllers\Admin\AdminThemeController::class, 'show']);
+        Route::put('/theme', [\App\Http\Controllers\Admin\AdminThemeController::class, 'update']);
 
         // Rewards (ยอดเสีย / ค่าแนะนำ)
         Route::get('/rewards/summary', [\App\Http\Controllers\Admin\AdminRewardController::class, 'summary']);
