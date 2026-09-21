@@ -24,6 +24,7 @@ class AdminThemeController extends Controller
             'status'   => 'success',
             'data'     => $this->theme->get(),
             'defaults' => ThemeService::DEFAULTS,
+            'fonts'    => ThemeService::FONTS,
         ]);
     }
 
@@ -45,6 +46,8 @@ class AdminThemeController extends Controller
             'radius'        => 'nullable|integer|min:0|max:32',
             'btn_depth'     => 'nullable|integer|min:0|max:12',
             'glow'          => 'nullable|integer|min:0|max:100',
+            'font'          => ['nullable', 'string', \Illuminate\Validation\Rule::in(ThemeService::FONTS)],
+            'font_scale'    => 'nullable|integer|min:85|max:125',
         ]);
 
         $data = array_filter($data, fn ($v) => $v !== null);
