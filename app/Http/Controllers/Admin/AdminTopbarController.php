@@ -25,6 +25,16 @@ class AdminTopbarController extends Controller
             ->distinct()
             ->count('tokenable_id');
 
+        $users = DB::table('personal_access_tokens as t')
+            ->join('users as u', 'u.id', '=', 't.tokenable_id')
+            ->where('t.tokenable_type', \App\Models\User::class)
+            ->where('t.last_used_at', '>=', $since)
+            ->groupBy('u.id', 'u.username')
+            ->selectRaw('u.id, u.username, MAX(t.last_used_at) AS last_seen')
+            ->orderByDesc('last_seen')
+            ->limit(100)
+            ->get();
+
         $staff = DB::table('personal_access_tokens as t')
             ->join('admins as a', 'a.id', '=', 't.tokenable_id')
             ->where('t.tokenable_type', \App\Models\Admin::class)
@@ -58,6 +68,7 @@ class AdminTopbarController extends Controller
             'status' => 'success',
             'data'   => [
                 'online_users' => $onlineUsers,
+                'users'        => $users,
                 'online_staff' => $staff->count(),
                 'staff'        => $staff,
                 'agent_credit' => $credit,
