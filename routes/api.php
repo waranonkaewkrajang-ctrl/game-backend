@@ -452,6 +452,9 @@ Route::prefix('admin')->group(function () {
             return response()->json(['data' => $query->paginate(50)]);
         });
 
+        // Top bar (ลูกค้าออนไลน์ / พนักงานออนไลน์ / เครดิต)
+        Route::get('/topbar', [\App\Http\Controllers\Admin\AdminTopbarController::class, 'index']);
+
         // Theme (ธีมหน้าเว็บลูกค้า)
         Route::get('/theme', [\App\Http\Controllers\Admin\AdminThemeController::class, 'show']);
         Route::put('/theme', [\App\Http\Controllers\Admin\AdminThemeController::class, 'update']);
