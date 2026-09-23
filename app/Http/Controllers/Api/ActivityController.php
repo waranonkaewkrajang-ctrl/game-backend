@@ -27,7 +27,7 @@ class ActivityController extends Controller
                 ->get([
                     'id', 'type', 'title', 'subtitle', 'image_url', 'image_thumb',
                     'slots', 'pages', 'link_url', 'badge', 'badge_color',
-                    'audience', 'show_once', 'config', 'sort_order',
+                    'audience', 'show_once', 'config', 'sort_order', 'end_at',
                 ])
                 ->map(function ($a) {
                     return [
@@ -44,6 +44,7 @@ class ActivityController extends Controller
                         'badge_color' => $a->badge_color,
                         'audience'    => $a->audience,
                         'show_once'   => (bool) $a->show_once,
+                        'end_at'      => $a->end_at ? $a->end_at->toIso8601String() : null,
                         'config'      => $this->publicConfig($a),
                     ];
                 })
