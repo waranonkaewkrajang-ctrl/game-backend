@@ -20,6 +20,7 @@ class ActivityController extends Controller
         $user = $request->user();
 
         // cache 60 วินาที — ลูกค้าหลายคนใช้ชุดเดียวกัน ไม่ต้องถามฐานข้อมูลทุกครั้ง
+        // เก็บ cache เป็น array ธรรมดา (Collection ของ Eloquent เก็บลง cache ไม่ได้)
         $all = Cache::remember('site_activities', 60, function () {
             return Activity::live()
                 ->orderBy('sort_order')->orderByDesc('id')
@@ -27,26 +28,44 @@ class ActivityController extends Controller
                     'id', 'type', 'title', 'subtitle', 'image_url', 'image_thumb',
                     'slots', 'pages', 'link_url', 'badge', 'badge_color',
                     'audience', 'show_once', 'config', 'sort_order',
-                ]);
+                ])
+                ->map(function ($a) {
+                    return [
+                        'id'          => $a->id,
+                        'type'        => $a->type,
+                        'title'       => $a->title,
+                        'subtitle'    => $a->subtitle,
+                        'image_url'   => $a->image_url,
+                        'image_thumb' => $a->image_thumb ?: $a->image_url,
+                        'slots'       => (array) $a->slots,
+                        'pages'       => (array) $a->pages,
+                        'link_url'    => $a->link_url,
+                        'badge'       => $a->badge,
+                        'badge_color' => $a->badge_color,
+                        'audience'    => $a->audience,
+                        'show_once'   => (bool) $a->show_once,
+                        'config'      => $this->publicConfig($a),
+                    ];
+                })
+                ->values()
+                ->all();
         });
 
-        $items = $all
-            ->filter(fn ($a) => $a->visibleTo($user))
-            ->filter(fn ($a) => $page === '' || empty($a->pages) || in_array($page, (array) $a->pages, true))
-            ->map(fn ($a) => [
-                'id'          => $a->id,
-                'type'        => $a->type,
-                'title'       => $a->title,
-                'subtitle'    => $a->subtitle,
-                'image_url'   => $a->image_url,
-                'image_thumb' => $a->image_thumb ?: $a->image_url,
-                'slots'       => $a->slots,
-                'link_url'    => $a->link_url,
-                'badge'       => $a->badge,
-                'badge_color' => $a->badge_color,
-                'show_once'   => $a->show_once,
-                'config'      => $this->publicConfig($a),
-            ])
+        $items = collect($all)
+            ->filter(function ($a) use ($user) {
+                return match ($a['audience']) {
+                    'member' => $user !== null,
+                    'guest'  => $user === null,
+                    default  => true,
+                };
+            })
+            ->filter(function ($a) use ($page) {
+                return $page === '' || empty($a['pages']) || in_array($page, $a['pages'], true);
+            })
+            ->map(function ($a) {
+                unset($a['audience'], $a['pages']);
+                return $a;
+            })
             ->values();
 
         return response()->json(['status' => 'success', 'data' => $items]);
@@ -63,9 +82,9 @@ class ActivityController extends Controller
      * ตัดค่าที่ลูกค้าไม่ควรเห็นออกจาก config
      * เช่น เฉลยหวย/ผลบอลที่แอดมินกรอกไว้ล่วงหน้า
      */
-    private function publicConfig(Activity $a): array
+    private function publicConfig($a): array
     {
-        $config = (array) $a->config;
+        $config = (array) ($a->config ?? []);
         foreach (['answer', 'result', 'winning_number', 'correct'] as $secret) {
             unset($config[$secret]);
         }
