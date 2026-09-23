@@ -36,7 +36,8 @@ class AdminBankStatementController extends Controller
             $query->where('created_at', '<=', $request->query('to'));
         }
 
-        $perPage = min((int) $request->query('per_page', 30), 100);
+                // เพดาน 2000 แถว กัน "ทั้งหมด" ทำให้หน้าค้าง
+        $perPage = max(1, min((int) $request->query('per_page', 30), 2000));
         $data = $query->paginate($perPage);
 
         return response()->json([
