@@ -17,8 +17,9 @@ return Application::configure(basePath: dirname(__DIR__))
         __DIR__.'/../routes/channels.php',
         ['middleware' => ['auth:sanctum']],
     )
-    ->withMiddleware(function (Middleware $middleware): void {
-        //
+        ->withMiddleware(function (Middleware $middleware): void {
+        // เชื่อ header จาก nginx เพื่อให้ $request->ip() เห็น IP จริงของผู้เรียก
+        $middleware->trustProxies(at: '*');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
