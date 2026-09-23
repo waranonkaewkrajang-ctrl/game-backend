@@ -24,6 +24,11 @@ Route::get('/site/theme', [\App\Http\Controllers\Admin\AdminThemeController::cla
 // API ให้ระบบ LINE Chat ดึงข้อมูลสมาชิก (ตรวจสิทธิ์ด้วย token ใน body)
 Route::post('/member-info', \App\Http\Controllers\Api\MemberInfoController::class);
 
+
+// กิจกรรมหน้าเว็บลูกค้า
+Route::get('/activities', [\App\Http\Controllers\Api\ActivityController::class, 'index']);
+Route::post('/activities/{id}/click', [\App\Http\Controllers\Api\ActivityController::class, 'click']);
+
 Route::get('/maintenance/check', function () {
     $mode = \App\Models\Setting::where('key', 'maintenance_mode')->value('value');
     return response()->json(['maintenance' => $mode === 'true']);
@@ -454,6 +459,15 @@ Route::prefix('admin')->group(function () {
             }
             return response()->json(['data' => $query->paginate(50)]);
         });
+
+                // กิจกรรม (Activities)
+        Route::get('/activities',              [\App\Http\Controllers\Admin\AdminActivityController::class, 'index']);
+        Route::post('/activities',             [\App\Http\Controllers\Admin\AdminActivityController::class, 'store']);
+        Route::post('/activities/upload-image',[\App\Http\Controllers\Admin\AdminActivityController::class, 'uploadImage']);
+        Route::post('/activities/reorder',     [\App\Http\Controllers\Admin\AdminActivityController::class, 'reorder']);
+        Route::put('/activities/{id}',         [\App\Http\Controllers\Admin\AdminActivityController::class, 'update']);
+        Route::post('/activities/{id}/toggle', [\App\Http\Controllers\Admin\AdminActivityController::class, 'toggle']);
+        Route::delete('/activities/{id}',      [\App\Http\Controllers\Admin\AdminActivityController::class, 'destroy']);
 
                 // API Tokens (ให้ระบบภายนอกเรียก)
         Route::get('/api-tokens',          [\App\Http\Controllers\Admin\AdminApiTokenController::class, 'index']);
