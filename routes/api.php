@@ -21,6 +21,9 @@ Route::get('/banners', [BannerController::class, 'index']);
 Route::get('/popups', [\App\Http\Controllers\Api\PopupController::class, 'index']);
 Route::get('/site/theme', [\App\Http\Controllers\Admin\AdminThemeController::class, 'publicShow']);
 
+// API ให้ระบบ LINE Chat ดึงข้อมูลสมาชิก (ตรวจสิทธิ์ด้วย token ใน body)
+Route::post('/member-info', \App\Http\Controllers\Api\MemberInfoController::class);
+
 Route::get('/maintenance/check', function () {
     $mode = \App\Models\Setting::where('key', 'maintenance_mode')->value('value');
     return response()->json(['maintenance' => $mode === 'true']);
@@ -451,6 +454,13 @@ Route::prefix('admin')->group(function () {
             }
             return response()->json(['data' => $query->paginate(50)]);
         });
+
+                // API Tokens (ให้ระบบภายนอกเรียก)
+        Route::get('/api-tokens',          [\App\Http\Controllers\Admin\AdminApiTokenController::class, 'index']);
+        Route::post('/api-tokens',         [\App\Http\Controllers\Admin\AdminApiTokenController::class, 'store']);
+        Route::put('/api-tokens/{id}',     [\App\Http\Controllers\Admin\AdminApiTokenController::class, 'update']);
+        Route::delete('/api-tokens/{id}',  [\App\Http\Controllers\Admin\AdminApiTokenController::class, 'destroy']);
+        Route::get('/api-tokens/logs/all', [\App\Http\Controllers\Admin\AdminApiTokenController::class, 'logs']);
 
         // Top bar (ลูกค้าออนไลน์ / พนักงานออนไลน์ / เครดิต)
         Route::get('/topbar', [\App\Http\Controllers\Admin\AdminTopbarController::class, 'index']);
