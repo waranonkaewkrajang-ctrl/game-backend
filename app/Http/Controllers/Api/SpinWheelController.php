@@ -79,6 +79,10 @@ class SpinWheelController extends Controller
             return response()->json(['message' => 'ยังไม่มีรางวัลในวงล้อ'], 422);
         }
         $prize = $this->randomByWeight($prizes);
+        if (!$prize) {
+            $wallet->increment('ticket_balance', $ticketCost);   // คืนตั๋วให้ลูกค้า
+            return response()->json(['message' => 'ยังไม่มีรางวัลที่เปิดโอกาสไว้'], 422);
+        }
 
         // === สุ่มตัวคูณ ===
         $multiplierValue = 1;
@@ -211,17 +215,29 @@ class SpinWheelController extends Controller
 
     private function randomByWeight($items)
     {
-        $totalWeight = $items->sum('probability');
-        $random = mt_rand(0, (int)($totalWeight * 100)) / 100;
+        // ตัดรางวัลที่โอกาสเป็น 0 ออกก่อน — ไม่ควรออกเลย
+        $pool = $items->filter(fn ($i) => (float) $i->probability > 0)->values();
+        if ($pool->isEmpty()) {
+            return null;
+        }
+
+        $totalWeight = (float) $pool->sum('probability');
+        if ($totalWeight <= 0) {
+            return null;
+        }
+
+        // สุ่มในช่วง (0, totalWeight] — ไม่เริ่มจาก 0 เพื่อกันรางวัลใบแรกถูกเลือกฟรี
+        $random = mt_rand(1, (int) round($totalWeight * 100)) / 100;
 
         $cumulative = 0;
-        foreach ($items as $item) {
-            $cumulative += $item->probability;
+        foreach ($pool as $item) {
+            $cumulative += (float) $item->probability;
             if ($random <= $cumulative) {
                 return $item;
             }
         }
 
-        return $items->last();
+        // เผื่อปัดเศษคลาดเคลื่อน — คืนใบสุดท้ายที่โอกาสมากกว่า 0
+        return $pool->last();
     }
 }
