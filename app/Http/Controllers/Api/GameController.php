@@ -323,6 +323,73 @@ class GameController extends Controller
         ]);
     }
 
+        /**
+     * ยกเลิกเดิมพัน + คืนเงิน (callback: cancelBets)
+     * ค่ายส่งมาเมื่อเดิมพันมีปัญหาหรือ timeout
+     */
+    public function cancelBets(Request $request): JsonResponse
+    {
+        $username = $request->input('username');
+
+        if (empty($username) || !is_string($username)) {
+            Log::warning('Callback cancel: username missing', $request->all());
+            return $this->cancelResponse($request, 10002, 0, 0, '');
+        }
+
+        $txns = $request->input('txns', []);
+
+        Log::info('RAW cancelBets', [
+            'productId' => $request->input('productId'),
+            'username'  => $username,
+            'txn_count' => count($txns),
+            'txns'      => collect($txns)->map(fn ($t) => [
+                'id'              => $t['id'] ?? null,
+                'status'          => $t['status'] ?? null,
+                'betAmount'       => $t['betAmount'] ?? null,
+                'roundId'         => $t['roundId'] ?? null,
+                'transactionType' => $t['transactionType'] ?? null,
+            ])->toArray(),
+        ]);
+
+        $user = \App\Models\User::where('amb_username', $username)->first();
+        $balanceBefore = $user ? $this->walletService->getBalance($user) : 0;
+
+        $result = ['status' => 'success', 'balance' => $balanceBefore];
+
+        foreach ($txns as $txn) {
+            $result = $this->callbackService->processCancel([
+                'username'         => $username,
+                'txn_id'           => $txn['id'] ?? null,
+                'round_id'         => $txn['roundId'] ?? $request->input('roundId'),
+                'game_id'          => $txn['gameCode'] ?? $request->input('gameCode'),
+                'provider'         => $request->input('productId', 'AMB'),
+                'bet_amount'       => $txn['betAmount'] ?? 0,
+                'cancel_status'    => $txn['status'] ?? null,               // REFUND | REJECT
+                'transaction_type' => $txn['transactionType'] ?? 'BY_TRANSACTION',
+                'raw'              => $request->all(),
+            ]);
+        }
+
+        $statusCode   = ($result['status'] === 'success') ? 0 : 10001;
+        $balanceAfter = (float) ($result['balance'] ?? ($user ? $this->walletService->getBalance($user) : 0));
+
+        return $this->cancelResponse($request, $statusCode, (float) $balanceBefore, $balanceAfter, $username);
+    }
+
+    private function cancelResponse(Request $request, int $statusCode, float $before, float $after, string $username): JsonResponse
+    {
+        return response()->json([
+            'id'              => $request->input('id', uniqid()),
+            'statusCode'      => $statusCode,
+            'timestampMillis' => (int) round(microtime(true) * 1000),
+            'productId'       => $request->input('productId', ''),
+            'currency'        => $request->input('currency', 'THB'),
+            'balanceBefore'   => $before,
+            'balanceAfter'    => $after,
+            'username'        => $username,
+        ]);
+    }
+
     // =====================================================
     //  WIN REWARDS CALLBACK (แจ็คพอต / โบนัสจากค่ายเกม)
     // =====================================================

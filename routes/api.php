@@ -57,6 +57,7 @@ Route::prefix('game/callback')->group(function () {
     Route::post('/placeBets',    [GameController::class, 'bet']);
     Route::post('/settleBets',   [GameController::class, 'win']);
     Route::post('/winRewards',   [GameController::class, 'winRewards']);
+    Route::post('/cancelBets',   [GameController::class, 'cancelBets']);
 });
 
 
