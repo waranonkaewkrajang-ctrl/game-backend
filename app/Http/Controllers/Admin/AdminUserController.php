@@ -37,11 +37,14 @@ class AdminUserController extends Controller
                         $q->where('phone', 'like', $digits !== '' ? "%{$digits}%" : $like);
                         break;
                     case 'full_name':
-                        // ค้นทีละคำ — เจอแม้เว้นวรรคไม่ตรง หรือพิมพ์แค่ชื่อหรือนามสกุล
+                        // ชื่อลูกค้าเก็บใน bank_name (ชื่อเจ้าของบัญชีตอนสมัคร) — ค้นทั้ง 2 ช่อง
                         $words = preg_split('/\s+/', trim($search), -1, PREG_SPLIT_NO_EMPTY);
                         $q->where(function ($s) use ($words) {
                             foreach ($words as $w) {
-                                $s->where('full_name', 'like', "%{$w}%");
+                                $s->where(function ($x) use ($w) {
+                                    $x->where('full_name', 'like', "%{$w}%")
+                                      ->orWhere('bank_name', 'like', "%{$w}%");
+                                });
                             }
                         });
                         break;
@@ -53,6 +56,7 @@ class AdminUserController extends Controller
                             $s->where('username', 'like', $like)
                               ->orWhere('phone', 'like', $like)
                               ->orWhere('full_name', 'like', $like)
+                              ->orWhere('bank_name', 'like', $like)
                               ->orWhere('bank_account', 'like', $like);
                             if ($digits !== '') {
                                 $s->orWhere('phone', 'like', "%{$digits}%")
