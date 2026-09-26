@@ -102,6 +102,7 @@ class PromotionService
             'turnover_current'   => 0,
             'turnover_completed' => false,
             'status'             => 'active',
+            'allowed_categories' => $promotion->allowed_categories ?? null,
         ]);
     }
 }

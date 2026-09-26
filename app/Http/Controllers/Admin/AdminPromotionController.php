@@ -32,6 +32,8 @@ class AdminPromotionController extends Controller
             'max_bonus'           => 'nullable|numeric|min:0',
             'bonus_percent'       => 'nullable|numeric|min:0|max:999',
             'turnover_multiplier' => 'nullable|numeric|min:0',
+            'allowed_categories'  => 'nullable|array',
+            'allowed_categories.*' => 'string|in:EGAMES,LIVECASINO,CARD,SPORT,TRADING',
             'max_withdraw'        => 'nullable|numeric|min:0',
             'is_active'           => 'nullable|boolean',
             'max_claims'          => 'nullable|integer|min:1',
@@ -68,6 +70,8 @@ class AdminPromotionController extends Controller
             'max_bonus'           => 'nullable|numeric|min:0',
             'bonus_percent'       => 'nullable|numeric|min:0|max:999',
             'turnover_multiplier' => 'nullable|numeric|min:0',
+            'allowed_categories'  => 'nullable|array',
+            'allowed_categories.*' => 'string|in:EGAMES,LIVECASINO,CARD,SPORT,TRADING',
             'max_withdraw'        => 'nullable|numeric|min:0',
             'is_active'           => 'nullable|boolean',
             'max_claims'          => 'nullable|integer|min:1',
@@ -76,7 +80,12 @@ class AdminPromotionController extends Controller
             'end_at'              => 'nullable|date',
         ]);
 
-        $promotion->update(array_filter($data));
+                // เก็บ allowed_categories ไว้แม้เป็น array ว่าง (= เล่นได้ทุกหมวด)
+        $filtered = array_filter($data, fn ($v) => $v !== null && $v !== '');
+        if ($request->has('allowed_categories')) {
+            $filtered['allowed_categories'] = $data['allowed_categories'] ?: null;
+        }
+        $promotion->update($filtered);
 
         return response()->json([
             'status'  => 'success',

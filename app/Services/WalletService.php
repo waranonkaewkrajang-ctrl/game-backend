@@ -233,6 +233,7 @@ public function addBonus(
                 'granted_by'          => $adminId,
                 'expired_at'          => $expiredAt,
                 'note'                => $note,
+                'allowed_categories'  => $options['allowed_categories'] ?? null,
             ]);
         }
 
