@@ -376,6 +376,57 @@ class GameController extends Controller
         return $this->cancelResponse($request, $statusCode, (float) $balanceBefore, $balanceAfter, $username);
     }
 
+        /**
+     * ปรับยอดเดิมพัน (callback: adjustBets)
+     * ค่ายส่งมาเมื่อยอดเดิมพันจริงต่างจากที่แจ้งตอนแรก
+     */
+    public function adjustBets(Request $request): JsonResponse
+    {
+        $username = $request->input('username');
+
+        if (empty($username) || !is_string($username)) {
+            Log::warning('Callback adjust: username missing', $request->all());
+            return $this->cancelResponse($request, 10002, 0, 0, '');
+        }
+
+        $txns = $request->input('txns', []);
+
+        Log::info('RAW adjustBets', [
+            'productId' => $request->input('productId'),
+            'username'  => $username,
+            'txn_count' => count($txns),
+            'txns'      => collect($txns)->map(fn ($t) => [
+                'id'        => $t['id'] ?? null,
+                'status'    => $t['status'] ?? null,
+                'betAmount' => $t['betAmount'] ?? null,
+                'roundId'   => $t['roundId'] ?? null,
+                'playInfo'  => $t['playInfo'] ?? null,
+            ])->toArray(),
+        ]);
+
+        $user = \App\Models\User::where('amb_username', $username)->first();
+        $balanceBefore = $user ? $this->walletService->getBalance($user) : 0;
+
+        $result = ['status' => 'success', 'balance' => $balanceBefore];
+
+        foreach ($txns as $txn) {
+            $result = $this->callbackService->processAdjust([
+                'username'   => $username,
+                'txn_id'     => $txn['id'] ?? null,
+                'round_id'   => $txn['roundId'] ?? $request->input('roundId'),
+                'game_id'    => $txn['gameCode'] ?? $request->input('gameCode'),
+                'provider'   => $request->input('productId', 'AMB'),
+                'bet_amount' => $txn['betAmount'] ?? 0,
+                'raw'        => $request->all(),
+            ]);
+        }
+
+        $statusCode   = ($result['status'] === 'success') ? 0 : 10001;
+        $balanceAfter = (float) ($result['balance'] ?? ($user ? $this->walletService->getBalance($user) : 0));
+
+        return $this->cancelResponse($request, $statusCode, (float) $balanceBefore, $balanceAfter, $username);
+    }
+
     private function cancelResponse(Request $request, int $statusCode, float $before, float $after, string $username): JsonResponse
     {
         return response()->json([
