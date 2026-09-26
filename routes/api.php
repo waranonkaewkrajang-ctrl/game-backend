@@ -460,6 +460,9 @@ Route::prefix('admin')->group(function () {
             return response()->json(['data' => $query->paginate(50)]);
         });
 
+        // เดิมพันค้าง (อ่านอย่างเดียว)
+        Route::get('/users/{id}/stuck-bets', [\App\Http\Controllers\Admin\AdminStuckBetController::class, 'byUser']);
+
                 // กิจกรรม (Activities)
         Route::get('/activities',              [\App\Http\Controllers\Admin\AdminActivityController::class, 'index']);
         Route::post('/activities',             [\App\Http\Controllers\Admin\AdminActivityController::class, 'store']);
