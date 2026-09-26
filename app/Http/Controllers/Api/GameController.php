@@ -75,6 +75,18 @@ class GameController extends Controller
             return response()->json(['status' => 'error', 'message' => 'ยอดเงินไม่เพียงพอ กรุณาฝากเงินก่อน'], 400);
         }
 
+        
+        // ── ล็อกประเภทเกมตามโปรที่ลูกค้ารับอยู่ ──
+        $blocked = $this->checkPromotionLock($user, (string) $data['productId'], (string) $data['gameCode']);
+        if ($blocked) {
+            return response()->json([
+                'status'   => 'error',
+                'message'  => $blocked['message'],
+                'code'     => 'PROMO_CATEGORY_LOCKED',
+                'allowed'  => $blocked['allowed'],
+            ], 403);
+        }
+
         $ambUsername = $this->getAMBUsername($user->username, $user->id);
         
         // บันทึก amb_username ถ้ายังไม่มี
@@ -611,6 +623,68 @@ public function recentlyPlayed(Request $request): JsonResponse
             ->paginate(20);
 
         return response()->json(['status' => 'success', 'data' => $logs]);
+    }
+
+        private const CATEGORY_NAMES = [
+        'EGAMES'     => 'สล็อต / เกมตู้',
+        'LIVECASINO' => 'คาสิโนสด',
+        'CARD'       => 'เกมไพ่',
+        'SPORT'      => 'กีฬา',
+        'TRADING'    => 'ไก่ชน',
+    ];
+
+    /**
+     * เช็คว่าลูกค้าติดโปรที่ล็อกประเภทเกมอยู่ไหม
+     * คืน null = เล่นได้ | คืน array = ห้ามเล่น
+     */
+    private function checkPromotionLock($user, string $productId, string $gameCode): ?array
+    {
+        // หาโปรที่ยังใช้งานอยู่ และมีการล็อกประเภท
+        $claim = \App\Models\PromotionClaim::where('user_id', $user->id)
+            ->where('status', 'active')
+            ->where('turnover_completed', false)
+            ->whereNotNull('allowed_categories')
+            ->orderByDesc('id')
+            ->first();
+
+        if (!$claim) {
+            return null;                                  // ไม่ติดโปร หรือโปรไม่ล็อก
+        }
+
+        $allowed = array_filter((array) $claim->allowed_categories);
+        if (empty($allowed)) {
+            return null;                                  // ล็อกว่าง = เล่นได้ทุกหมวด
+        }
+
+        // หาหมวดของเกมที่จะเข้า
+        $category = \Illuminate\Support\Facades\DB::table('games')
+            ->where('product_id', $productId)
+            ->when($gameCode !== '', fn ($q) => $q->where('game_code', $gameCode))
+            ->value('category');
+
+        // ถ้าหาไม่เจอด้วย gameCode ลองหาจากค่ายอย่างเดียว
+        if (!$category) {
+            $category = \Illuminate\Support\Facades\DB::table('games')
+                ->where('product_id', $productId)
+                ->value('category');
+        }
+
+        // ไม่รู้หมวด → ปล่อยผ่าน (กันบล็อกผิดพลาด)
+        if (!$category) {
+            \Log::warning('checkPromotionLock: ไม่พบหมวดของเกม', ['productId' => $productId, 'gameCode' => $gameCode]);
+            return null;
+        }
+
+        if (in_array($category, $allowed, true)) {
+            return null;                                  // อยู่ในหมวดที่อนุญาต
+        }
+
+        $names = array_map(fn ($c) => self::CATEGORY_NAMES[$c] ?? $c, $allowed);
+
+        return [
+            'message' => 'โปรโมชันที่รับอยู่เล่นได้เฉพาะ ' . implode(' / ', $names) . ' เท่านั้น กรุณาทำเทิร์นให้ครบก่อน',
+            'allowed' => $names,
+        ];
     }
 
     // =====================================================
