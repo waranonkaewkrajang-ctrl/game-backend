@@ -12,13 +12,16 @@ class Promotion extends Model
     protected $fillable = [
         'title', 'description', 'image_url', 'type',
         'min_deposit', 'max_bonus', 'bonus_percent',
-        'turnover_multiplier','allowed_categories', 'max_withdraw',
+        'turnover_multiplier','allowed_categories','allowed_providers',
+        'allowed_games', 'max_withdraw',
         'is_active', 'max_claims', 'claims_per_user',
         'start_at', 'end_at',
     ];
 
     protected $casts = [
         'allowed_categories' => 'array',
+        'allowed_providers'  => 'array',
+        'allowed_games'      => 'array',
         'min_deposit'         => 'decimal:2',
         'max_bonus'           => 'decimal:2',
         'bonus_percent'       => 'decimal:2',

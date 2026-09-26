@@ -462,6 +462,11 @@ Route::prefix('admin')->group(function () {
             return response()->json(['data' => $query->paginate(50)]);
         });
 
+                // รายการค่าย/เกม สำหรับตั้งค่าโปรโมชัน
+        Route::get('/game-catalog/providers',     [\App\Http\Controllers\Admin\AdminGameCatalogController::class, 'providers']);
+        Route::get('/game-catalog/games',         [\App\Http\Controllers\Admin\AdminGameCatalogController::class, 'games']);
+        Route::post('/game-catalog/games-by-keys',[\App\Http\Controllers\Admin\AdminGameCatalogController::class, 'gamesByKeys']);
+
         // เดิมพันค้าง (อ่านอย่างเดียว)
         Route::get('/users/{id}/stuck-bets', [\App\Http\Controllers\Admin\AdminStuckBetController::class, 'byUser']);
 

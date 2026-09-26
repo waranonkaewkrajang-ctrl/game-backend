@@ -103,6 +103,8 @@ class PromotionService
             'turnover_completed' => false,
             'status'             => 'active',
             'allowed_categories' => $promotion->allowed_categories ?? null,
+            'allowed_providers'  => $promotion->allowed_providers ?? null,
+            'allowed_games'      => $promotion->allowed_games ?? null,
         ]);
     }
 }

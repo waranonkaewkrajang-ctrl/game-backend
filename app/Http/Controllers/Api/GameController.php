@@ -633,57 +633,81 @@ public function recentlyPlayed(Request $request): JsonResponse
         'TRADING'    => 'ไก่ชน',
     ];
 
-    /**
-     * เช็คว่าลูกค้าติดโปรที่ล็อกประเภทเกมอยู่ไหม
+       /**
+     * เช็คว่าลูกค้าติดโปรที่ล็อกการเข้าเล่นอยู่ไหม
+     * เล่นได้ถ้าเข้าเงื่อนไขข้อใดข้อหนึ่ง: หมวด / ค่าย / เกมเฉพาะ
      * คืน null = เล่นได้ | คืน array = ห้ามเล่น
      */
     private function checkPromotionLock($user, string $productId, string $gameCode): ?array
     {
-        // หาโปรที่ยังใช้งานอยู่ และมีการล็อกประเภท
         $claim = \App\Models\PromotionClaim::where('user_id', $user->id)
             ->where('status', 'active')
             ->where('turnover_completed', false)
-            ->whereNotNull('allowed_categories')
+            ->where(function ($q) {
+                $q->whereNotNull('allowed_categories')
+                  ->orWhereNotNull('allowed_providers')
+                  ->orWhereNotNull('allowed_games');
+            })
             ->orderByDesc('id')
             ->first();
 
         if (!$claim) {
-            return null;                                  // ไม่ติดโปร หรือโปรไม่ล็อก
+            return null;                                   // ไม่ติดโปร หรือโปรไม่ล็อก
         }
 
-        $allowed = array_filter((array) $claim->allowed_categories);
-        if (empty($allowed)) {
-            return null;                                  // ล็อกว่าง = เล่นได้ทุกหมวด
+        $cats  = array_filter((array) $claim->allowed_categories);
+        $provs = array_filter((array) $claim->allowed_providers);
+        $games = array_filter((array) $claim->allowed_games);
+
+        if (empty($cats) && empty($provs) && empty($games)) {
+            return null;                                   // ล็อกว่างทั้งหมด = เล่นได้ทุกอย่าง
         }
 
-        // หาหมวดของเกมที่จะเข้า
-        $category = \Illuminate\Support\Facades\DB::table('games')
-            ->where('product_id', $productId)
-            ->when($gameCode !== '', fn ($q) => $q->where('game_code', $gameCode))
-            ->value('category');
-
-        // ถ้าหาไม่เจอด้วย gameCode ลองหาจากค่ายอย่างเดียว
-        if (!$category) {
-            $category = \Illuminate\Support\Facades\DB::table('games')
-                ->where('product_id', $productId)
-                ->value('category');
-        }
-
-        // ไม่รู้หมวด → ปล่อยผ่าน (กันบล็อกผิดพลาด)
-        if (!$category) {
-            \Log::warning('checkPromotionLock: ไม่พบหมวดของเกม', ['productId' => $productId, 'gameCode' => $gameCode]);
+        // 1) เกมเฉพาะ — ตรงตัวที่สุด
+        if (!empty($games) && in_array($productId . ':' . $gameCode, $games, true)) {
             return null;
         }
 
-        if (in_array($category, $allowed, true)) {
-            return null;                                  // อยู่ในหมวดที่อนุญาต
+        // 2) ค่ายเกม
+        if (!empty($provs) && in_array($productId, $provs, true)) {
+            return null;
         }
 
-        $names = array_map(fn ($c) => self::CATEGORY_NAMES[$c] ?? $c, $allowed);
+        // 3) หมวด
+        if (!empty($cats)) {
+            $category = \Illuminate\Support\Facades\DB::table('games')
+                ->where('product_id', $productId)
+                ->when($gameCode !== '', fn ($q) => $q->where('game_code', $gameCode))
+                ->value('category')
+                ?: \Illuminate\Support\Facades\DB::table('games')
+                    ->where('product_id', $productId)
+                    ->value('category');
+
+            if (!$category) {
+                \Log::warning('checkPromotionLock: ไม่พบหมวดของเกม', ['productId' => $productId, 'gameCode' => $gameCode]);
+                return null;                               // ไม่รู้หมวด → ปล่อยผ่าน กันบล็อกผิด
+            }
+
+            if (in_array($category, $cats, true)) {
+                return null;
+            }
+        }
+
+        // ── ไม่เข้าเงื่อนไขไหนเลย → ห้ามเล่น ──
+        $parts = [];
+        if (!empty($cats)) {
+            $parts[] = implode(' / ', array_map(fn ($c) => self::CATEGORY_NAMES[$c] ?? $c, $cats));
+        }
+        if (!empty($provs)) {
+            $parts[] = 'ค่าย ' . implode(' / ', array_slice($provs, 0, 5)) . (count($provs) > 5 ? ' และอื่นๆ' : '');
+        }
+        if (!empty($games)) {
+            $parts[] = 'เกมที่กำหนด ' . count($games) . ' เกม';
+        }
 
         return [
-            'message' => 'โปรโมชันที่รับอยู่เล่นได้เฉพาะ ' . implode(' / ', $names) . ' เท่านั้น กรุณาทำเทิร์นให้ครบก่อน',
-            'allowed' => $names,
+            'message' => 'โปรโมชันที่รับอยู่เล่นได้เฉพาะ ' . implode(' · ', $parts) . ' เท่านั้น กรุณาทำเทิร์นให้ครบก่อน',
+            'allowed' => $parts,
         ];
     }
 
