@@ -37,7 +37,13 @@ class AdminUserController extends Controller
                         $q->where('phone', 'like', $digits !== '' ? "%{$digits}%" : $like);
                         break;
                     case 'full_name':
-                        $q->where('full_name', 'like', $like);
+                        // ค้นทีละคำ — เจอแม้เว้นวรรคไม่ตรง หรือพิมพ์แค่ชื่อหรือนามสกุล
+                        $words = preg_split('/\s+/', trim($search), -1, PREG_SPLIT_NO_EMPTY);
+                        $q->where(function ($s) use ($words) {
+                            foreach ($words as $w) {
+                                $s->where('full_name', 'like', "%{$w}%");
+                            }
+                        });
                         break;
                     case 'bank_account':
                         $q->where('bank_account', 'like', $digits !== '' ? "%{$digits}%" : $like);
