@@ -10,13 +10,16 @@ class PromotionClaim extends Model
     'user_id', 'promotion_id', 'deposit_id',
     'type',
     'bonus_amount', 'turnover_multiplier',
-    'turnover_required','allowed_categories', 'turnover_current',
+    'turnover_required','allowed_categories', 'allowed_providers',
+        'allowed_games','turnover_current',
     'turnover_completed', 'status',
     'granted_by', 'completed_at', 'expired_at', 'note',
 ];
 
     protected $casts = [
     'allowed_categories' => 'array',
+    'allowed_providers'  => 'array',
+    'allowed_games'      => 'array',
     'bonus_amount'        => 'decimal:2',
     'turnover_multiplier' => 'decimal:2',
     'turnover_required'   => 'decimal:2',

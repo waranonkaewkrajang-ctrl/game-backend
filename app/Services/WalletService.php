@@ -234,6 +234,8 @@ public function addBonus(
                 'expired_at'          => $expiredAt,
                 'note'                => $note,
                 'allowed_categories'  => $options['allowed_categories'] ?? null,
+                'allowed_providers'   => $options['allowed_providers'] ?? null,
+                'allowed_games'       => $options['allowed_games'] ?? null,
             ]);
         }
 

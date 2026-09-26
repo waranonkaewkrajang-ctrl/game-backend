@@ -34,6 +34,10 @@ class AdminPromotionController extends Controller
             'turnover_multiplier' => 'nullable|numeric|min:0',
             'allowed_categories'  => 'nullable|array',
             'allowed_categories.*' => 'string|in:EGAMES,LIVECASINO,CARD,SPORT,TRADING',
+            'allowed_providers'   => 'nullable|array',
+            'allowed_providers.*' => 'string|max:50',
+            'allowed_games'       => 'nullable|array',
+            'allowed_games.*'     => 'string|max:120',
             'max_withdraw'        => 'nullable|numeric|min:0',
             'is_active'           => 'nullable|boolean',
             'max_claims'          => 'nullable|integer|min:1',
@@ -72,6 +76,10 @@ class AdminPromotionController extends Controller
             'turnover_multiplier' => 'nullable|numeric|min:0',
             'allowed_categories'  => 'nullable|array',
             'allowed_categories.*' => 'string|in:EGAMES,LIVECASINO,CARD,SPORT,TRADING',
+            'allowed_providers'   => 'nullable|array',
+            'allowed_providers.*' => 'string|max:50',
+            'allowed_games'       => 'nullable|array',
+            'allowed_games.*'     => 'string|max:120',
             'max_withdraw'        => 'nullable|numeric|min:0',
             'is_active'           => 'nullable|boolean',
             'max_claims'          => 'nullable|integer|min:1',
@@ -82,8 +90,10 @@ class AdminPromotionController extends Controller
 
                 // เก็บ allowed_categories ไว้แม้เป็น array ว่าง (= เล่นได้ทุกหมวด)
         $filtered = array_filter($data, fn ($v) => $v !== null && $v !== '');
-        if ($request->has('allowed_categories')) {
-            $filtered['allowed_categories'] = $data['allowed_categories'] ?: null;
+        foreach (['allowed_categories', 'allowed_providers', 'allowed_games'] as $k) {
+            if ($request->has($k)) {
+                $filtered[$k] = $data[$k] ?: null;
+            }
         }
         $promotion->update($filtered);
 
