@@ -247,6 +247,126 @@ try {
         ];
     }
 
+        /**
+     * ปรับยอดเดิมพัน (callback: adjustBets)
+     * สูตรตามเอกสาร: ยอดใหม่ = ยอดปัจจุบัน + ยอดเดิม - ยอดที่ค่ายส่งมา
+     * ไม่แตะ processBet / processWin / processCancel เดิม
+     */
+    public function processAdjust(array $data): array
+    {
+        $user = User::where('amb_username', $data['username'])->first();
+
+        if (!$user) {
+            return ['status' => 'error', 'message' => 'USER_NOT_FOUND'];
+        }
+
+        $txnId      = $data['txn_id'] ?? null;
+        $roundId    = $data['round_id'];
+        $logRoundId = $txnId ? $roundId . '|' . $txnId : $roundId;
+        $newAmount  = (float) ($data['bet_amount'] ?? 0);
+
+        // หารายการเดิมพันเดิม
+        $betLog = GameLog::where('user_id', $user->id)
+            ->where('action', 'bet')
+            ->where('round_id', $logRoundId)
+            ->first();
+
+        if (!$betLog) {
+            Log::warning('Adjust: ไม่พบรายการเดิมพัน', ['round_id' => $roundId, 'txn_id' => $txnId]);
+            return [
+                'status'  => 'success',                    // ตอบสำเร็จ ไม่ให้ค่ายยิงซ้ำไม่จบ
+                'balance' => $this->walletService->getBalance($user),
+                'message' => 'BET_NOT_FOUND',
+            ];
+        }
+
+        // settle แล้วไม่ปรับ
+        if (GameLog::where('round_id', $logRoundId . '_win')->exists()) {
+            Log::warning('Adjust: ตานี้ settle แล้ว ไม่ปรับ', ['round_id' => $logRoundId]);
+            return [
+                'status'  => 'success',
+                'balance' => $this->walletService->getBalance($user),
+                'message' => 'ALREADY_SETTLED',
+            ];
+        }
+
+        // ยกเลิกไปแล้วไม่ปรับ
+        if (GameLog::where('round_id', $logRoundId . '_cancel_win')->exists()) {
+            return [
+                'status'  => 'success',
+                'balance' => $this->walletService->getBalance($user),
+                'message' => 'ALREADY_CANCELLED',
+            ];
+        }
+
+        // หายอดล่าสุดของตานี้ (เผื่อเคยปรับมาแล้ว)
+        $lastAdjust = GameLog::where('user_id', $user->id)
+            ->where('action', 'adjust')
+            ->where('round_id', 'like', $logRoundId . '_adjust%')
+            ->orderByDesc('id')
+            ->first();
+
+        $oldAmount = $lastAdjust ? (float) $lastAdjust->bet_amount : (float) $betLog->bet_amount;
+        $diff      = $newAmount - $oldAmount;   // บวก = ต้องหักเพิ่ม | ลบ = ต้องคืน
+
+        if (abs($diff) < 0.01) {
+            return [
+                'status'  => 'success',
+                'balance' => $this->walletService->getBalance($user),
+                'message' => 'NO_CHANGE',
+            ];
+        }
+
+        try {
+            $seq   = ($lastAdjust ? 1 : 0) + GameLog::where('round_id', 'like', $logRoundId . '_adjust%')->count();
+            $tag   = $logRoundId . '_adjust' . ($seq > 0 ? $seq : '');
+
+            if ($diff > 0) {
+                // ยอดใหม่มากกว่าเดิม → หักเพิ่ม
+                $tx = $this->walletService->bet($user, $diff, $tag, $betLog->game_id, $betLog->provider, $data['raw'] ?? []);
+            } else {
+                // ยอดใหม่น้อยกว่าเดิม → คืนส่วนต่าง
+                $tx = $this->walletService->win($user, abs($diff), $tag, $betLog->game_id, $betLog->provider, $data['raw'] ?? []);
+            }
+
+            // บันทึกยอดล่าสุดไว้อ้างอิงครั้งหน้า
+            GameLog::create([
+                'user_id'        => $user->id,
+                'provider'       => $betLog->provider,
+                'game_id'        => $betLog->game_id,
+                'round_id'       => $tag . '_ref',
+                'action'         => 'adjust',
+                'bet_amount'     => $newAmount,
+                'win_amount'     => 0,
+                'balance_before' => $tx->balance_before,
+                'balance_after'  => $tx->balance_after,
+                'raw_data'       => $data['raw'] ?? [],
+            ]);
+
+            Log::info('ปรับยอดเดิมพันจาก adjustBets', [
+                'user'     => $data['username'],
+                'round_id' => $logRoundId,
+                'เดิม'     => $oldAmount,
+                'ใหม่'     => $newAmount,
+                'ส่วนต่าง' => $diff,
+                'balance'  => $tx->balance_after,
+            ]);
+
+            return [
+                'status'  => 'success',
+                'balance' => (float) $tx->balance_after,
+                'diff'    => $diff,
+            ];
+        } catch (\Exception $e) {
+            Log::error('ปรับยอดไม่สำเร็จ', ['round_id' => $logRoundId, 'error' => $e->getMessage()]);
+            return [
+                'status'  => 'error',
+                'message' => $e->getMessage(),
+                'balance' => $this->walletService->getBalance($user),
+            ];
+        }
+    }
+
     public function validateSignature(string $payload, string $signature, string $secretKey): bool
     {
         $expected = md5($payload . $secretKey);
