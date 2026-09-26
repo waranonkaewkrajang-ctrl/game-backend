@@ -22,11 +22,38 @@ class AdminUserController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $field = $request->input('search_by', 'all');   // all | username | phone | full_name | bank_account
+
         $users = User::with('wallet')
-            ->when($request->search, function ($q, $search) {
-                $q->where('username', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%")
-                  ->orWhere('full_name', 'like', "%{$search}%");
+            ->when($request->search, function ($q, $search) use ($field) {
+                $like = "%{$search}%";
+                $digits = preg_replace('/\D/', '', $search);
+
+                switch ($field) {
+                    case 'username':
+                        $q->where('username', 'like', $like);
+                        break;
+                    case 'phone':
+                        $q->where('phone', 'like', $digits !== '' ? "%{$digits}%" : $like);
+                        break;
+                    case 'full_name':
+                        $q->where('full_name', 'like', $like);
+                        break;
+                    case 'bank_account':
+                        $q->where('bank_account', 'like', $digits !== '' ? "%{$digits}%" : $like);
+                        break;
+                    default:   // ค้นทุกคอลัมน์
+                        $q->where(function ($s) use ($like, $digits) {
+                            $s->where('username', 'like', $like)
+                              ->orWhere('phone', 'like', $like)
+                              ->orWhere('full_name', 'like', $like)
+                              ->orWhere('bank_account', 'like', $like);
+                            if ($digits !== '') {
+                                $s->orWhere('phone', 'like', "%{$digits}%")
+                                  ->orWhere('bank_account', 'like', "%{$digits}%");
+                            }
+                        });
+                }
             })
             ->when($request->status, fn ($q, $s) => $q->where('status', $s))
             ->orderBy('created_at', 'desc')
