@@ -462,6 +462,9 @@ Route::prefix('admin')->group(function () {
             return response()->json(['data' => $query->paginate(50)]);
         });
 
+                // อัปโหลดรูปแรงค์
+        Route::post('/ranks/upload-image', [\App\Http\Controllers\Admin\AdminRankController::class, 'uploadImage']);
+
                 // รายการค่าย/เกม สำหรับตั้งค่าโปรโมชัน
         Route::get('/game-catalog/providers',     [\App\Http\Controllers\Admin\AdminGameCatalogController::class, 'providers']);
         Route::get('/game-catalog/games',         [\App\Http\Controllers\Admin\AdminGameCatalogController::class, 'games']);
