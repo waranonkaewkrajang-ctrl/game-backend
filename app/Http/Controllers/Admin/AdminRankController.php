@@ -36,7 +36,7 @@ class AdminRankController extends Controller
         // แปลงเป็น WebP + ย่อเหลือ 256px (ไอคอนไม่ต้องใหญ่)
         $done = false;
         if (@is_executable('/usr/bin/cwebp')) {
-            @exec(sprintf('/usr/bin/cwebp -q 88 -resize 256 0 %s -o %s 2>&1', escapeshellarg($tmp), escapeshellarg($out)), $o, $code);
+            @exec(sprintf('/usr/bin/cwebp -q 88 -alpha_q 100 -resize 256 0 %s -o %s 2>&1', escapeshellarg($tmp), escapeshellarg($out)), $o, $code);
             $done = ($code === 0 && file_exists($out));
         }
         if (!$done && @is_executable('/usr/bin/convert')) {
