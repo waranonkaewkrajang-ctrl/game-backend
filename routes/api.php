@@ -46,7 +46,7 @@ Route::prefix('auth')->group(function () {
 // =====================================================
 //  TRUEWALLET WEBHOOK
 // =====================================================
-Route::post('/truewallet/webhook', [\App\Http\Controllers\Api\TrueWalletWebhookController::class, 'webhook']);
+Route::post('/truewallet/webhook', [\App\Http\Controllers\Api\TrueWalletWebhookController::class, 'webhook'])->middleware('truewallet.sig');
 
 
 // =====================================================

@@ -18,7 +18,7 @@ class TrueWalletWebhookController extends Controller
 {
     public function webhook(Request $request, DepositService $depositService)
     {
-        $secret = env('TRUEWALLET_WEBHOOK_SECRET', '');
+        $secret = (string) config('truewallet.webhook_secret', '');
 
         // TrueWallet verify ping
         if ($request->has('test') || empty($request->getContent())) {

@@ -136,6 +136,15 @@ return [
             'formatter' => \Monolog\Formatter\JsonFormatter::class,
         ],
 
+        // ผลตรวจลายเซ็น TrueWallet webhook (อ่านด้วย truewallet:webhook-report)
+        'truewallet_webhook' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/truewallet-webhook.log'),
+            'level' => 'debug',
+            'days' => 30,
+            'formatter' => \Monolog\Formatter\JsonFormatter::class,
+        ],
+
     ],
 
 ];
