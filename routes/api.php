@@ -266,7 +266,7 @@ Route::prefix('admin')->group(function () {
     Route::post('/login',      [AdminAuthController::class, 'login']);
     Route::post('/verify-2fa', [AdminAuthController::class, 'verifyTwoFactor']);
 
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', 'admin'])->group(function () {
 
         // Auth & 2FA
         Route::post('/logout',      [AdminAuthController::class, 'logout']);
