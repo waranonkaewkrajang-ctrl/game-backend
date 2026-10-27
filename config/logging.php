@@ -145,6 +145,15 @@ return [
             'formatter' => \Monolog\Formatter\JsonFormatter::class,
         ],
 
+        // ผลการให้โบนัสโปรตอนอนุมัติฝาก (GRANTED / SKIPPED + เหตุผล / ERROR)
+        'promotion_bonus' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/promotion-bonus.log'),
+            'level' => 'debug',
+            'days' => 90,
+            'formatter' => \Monolog\Formatter\JsonFormatter::class,
+        ],
+
     ],
 
 ];

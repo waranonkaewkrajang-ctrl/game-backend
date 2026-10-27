@@ -3,7 +3,10 @@
 namespace App\Services;
 
 use App\Models\Deposit;
+use App\Models\PromotionClaim;
 use App\Models\Setting;
+use App\Models\Wallet;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Models\User;
 use Illuminate\Support\Str;
@@ -12,6 +15,7 @@ class DepositService
 {
     public function __construct(
         private WalletService $walletService,
+        private PromotionService $promotionService,
     ) {}
 
     public function createRequest(User $user, array $data): Deposit
@@ -54,27 +58,35 @@ class DepositService
 
     public function approve(Deposit $deposit, ?int $adminId): Deposit
     {
-        if ($deposit->status !== 'pending') {
-            throw new \Exception('รายการนี้ถูกดำเนินการแล้ว');
-        }
+        // 🔒 lock แถว + เช็คสถานะภายใต้ lock + เติมเงิน/เปลี่ยนสถานะใน transaction เดียว (กันอนุมัติซ้ำ)
+        $deposit = DB::transaction(function () use ($deposit, $adminId) {
+            $locked = Deposit::whereKey($deposit->id)->lockForUpdate()->first();
+
+            if (!$locked || $locked->status !== 'pending') {
+                throw new \Exception('รายการนี้ถูกดำเนินการแล้ว');
+            }
+
+            $this->walletService->deposit(
+                $locked->user,
+                $locked->amount,
+                'ฝากเงิน #' . $locked->reference_id,
+                ['deposit_id' => $locked->id],
+                $adminId
+            );
+
+            $locked->update([
+                'status'      => 'approved',
+                'approved_by' => $adminId,
+                'approved_at' => now(),
+            ]);
+
+            return $locked->fresh();
+        });
 
         $user = $deposit->user;
 
-        $this->walletService->deposit(
-            $user,
-            $deposit->amount,
-            'ฝากเงิน #' . $deposit->reference_id,
-            ['deposit_id' => $deposit->id],
-            $adminId
-        );
-
-        $deposit->update([
-            'status'      => 'approved',
-            'approved_by' => $adminId,
-            'approved_at' => now(),
-        ]);
-
-        $deposit = $deposit->fresh();
+        // 🎁 โบนัสโปร — ทำหลัง commit ถ้าพังยอดฝากต้องเข้าตามปกติ
+        $this->applyPromotionBonus($deposit, $adminId);
 
         // 🆕 ให้ตั๋ววงล้ออัตโนมัติ ถ้าฝากเงินถึงขั้นต่ำ
         try {
@@ -163,16 +175,23 @@ class DepositService
 
     public function reject(Deposit $deposit, int $adminId, string $reason): Deposit
     {
-        if ($deposit->status !== 'pending') {
-            throw new \Exception('รายการนี้ถูกดำเนินการแล้ว');
-        }
+        // 🔒 กันอนุมัติกับปฏิเสธชนกัน
+        $deposit = DB::transaction(function () use ($deposit, $adminId, $reason) {
+            $locked = Deposit::whereKey($deposit->id)->lockForUpdate()->first();
 
-        $deposit->update([
-            'status'        => 'rejected',
-            'reject_reason' => $reason,
-            'approved_by'   => $adminId,
-            'approved_at'   => now(),
-        ]);
+            if (!$locked || $locked->status !== 'pending') {
+                throw new \Exception('รายการนี้ถูกดำเนินการแล้ว');
+            }
+
+            $locked->update([
+                'status'        => 'rejected',
+                'reject_reason' => $reason,
+                'approved_by'   => $adminId,
+                'approved_at'   => now(),
+            ]);
+
+            return $locked;
+        });
 
                 // 🆕 แจ้ง Sidebar อัพเดทจำนวน pending
         try {
@@ -181,5 +200,56 @@ class DepositService
         } catch (\Exception $e) {}
 
         return $deposit->fresh();
+    }
+
+    /**
+     * ให้โบนัสตามโปรที่ลูกค้าเลือกไว้ตอนแจ้งฝาก + log ทุกผล (GRANTED / SKIPPED / ERROR)
+     */
+    private function applyPromotionBonus(Deposit $deposit, ?int $adminId): void
+    {
+        if (!$deposit->promotion_id) {
+            return;
+        }
+
+        try {
+            $result = DB::transaction(function () use ($deposit) {
+                // ทำทีละรายการต่อ user — canClaim() นับสิทธิ์แบบไม่ lock
+                Wallet::where('user_id', $deposit->user_id)->lockForUpdate()->first();
+
+                if (PromotionClaim::where('deposit_id', $deposit->id)->exists()) {
+                    return ['granted' => false, 'code' => 'already_granted', 'reason' => 'รายการนี้ได้โบนัสไปแล้ว'];
+                }
+
+                return $this->promotionService->applyBonusWithReason($deposit->user, $deposit);
+            });
+
+            $this->bonusLog($result['granted'] ? 'GRANTED' : 'SKIPPED', $deposit, $adminId, [
+                'code'     => $result['code'],
+                'reason'   => $result['reason'],
+                'bonus'    => $result['bonus'] ?? null,
+                'turnover' => $result['turnover'] ?? null,
+                'claim_id' => isset($result['claim']) ? $result['claim']?->id : null,
+            ]);
+        } catch (\Throwable $e) {
+            $this->bonusLog('ERROR', $deposit, $adminId, ['code' => 'exception', 'reason' => $e->getMessage()]);
+        }
+    }
+
+    private function bonusLog(string $result, Deposit $deposit, ?int $adminId, array $extra): void
+    {
+        $level = ['GRANTED' => 'info', 'SKIPPED' => 'warning', 'ERROR' => 'error'][$result];
+
+        try {
+            Log::channel('promotion_bonus')->log($level, $result, $extra + [
+                'deposit_id'   => $deposit->id,
+                'user_id'      => $deposit->user_id,
+                'promotion_id' => $deposit->promotion_id,
+                'amount'       => (string) $deposit->amount,
+                'approved_by'  => $adminId,
+                'method'       => $deposit->approved_method ?? 'manual',
+            ]);
+        } catch (\Throwable $e) {
+            // log พังต้องไม่กระทบการอนุมัติฝาก
+        }
     }
 }

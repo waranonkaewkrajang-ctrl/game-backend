@@ -9,6 +9,7 @@ use App\Services\WalletService;
 use App\Services\TelegramService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class AdminUnmatchedDepositController extends Controller
 {
@@ -76,34 +77,51 @@ class AdminUnmatchedDepositController extends Controller
             return response()->json(['status' => 'error', 'message' => 'ไม่พบสมาชิก "' . $data['username_or_phone'] . '"'], 404);
         }
 
-        // สร้างรายการฝากในระบบ
-        $deposit = \App\Models\Deposit::create([
-            'user_id'      => $user->id,
-            'reference_id' => 'UMD-' . now()->format('Ymd') . '-' . strtoupper(\Illuminate\Support\Str::random(8)),
-            'amount'       => $unmatchedDeposit->amount,
-            'channel'      => 'bank_transfer',
-            'from_bank'    => $unmatchedDeposit->bank,
-            'from_account' => $unmatchedDeposit->from_account,
-            'status'       => 'approved',
-            'approved_by'  => $request->user()->id,
-            'approved_at'  => now(),
-        ]);
+        // 🔒 lock แถวยอดค้าง + สร้างฝาก/เติมเงิน/ปิดรายการใน transaction เดียว (กันเติมเงินซ้ำ)
+        $deposit = DB::transaction(function () use ($unmatchedDeposit, $user, $request) {
+            $locked = UnmatchedDeposit::whereKey($unmatchedDeposit->id)->lockForUpdate()->first();
 
-        // เติมเงินเข้ากระเป๋า
-        $this->walletService->deposit(
-            $user,
-            (float) $unmatchedDeposit->amount,
-            'เติมเงินจากยอดค้าง #' . $unmatchedDeposit->id,
-            ['unmatched_deposit_id' => $unmatchedDeposit->id, 'deposit_id' => $deposit->id],
-            $request->user()->id
-        );
+            if (!$locked || $locked->status !== 'pending') {
+                return null;
+            }
 
-        $unmatchedDeposit->update([
-            'status'          => 'approved',
-            'matched_user_id' => $user->id,
-            'approved_by'     => $request->user()->id,
-            'approved_at'     => now(),
-        ]);
+            // สร้างรายการฝากในระบบ
+            $deposit = \App\Models\Deposit::create([
+                'user_id'      => $user->id,
+                'reference_id' => 'UMD-' . now()->format('Ymd') . '-' . strtoupper(\Illuminate\Support\Str::random(8)),
+                'amount'       => $locked->amount,
+                'channel'      => 'bank_transfer',
+                'from_bank'    => $locked->bank,
+                'from_account' => $locked->from_account,
+                'status'       => 'approved',
+                'approved_by'  => $request->user()->id,
+                'approved_at'  => now(),
+            ]);
+
+            // เติมเงินเข้ากระเป๋า
+            $this->walletService->deposit(
+                $user,
+                (float) $locked->amount,
+                'เติมเงินจากยอดค้าง #' . $locked->id,
+                ['unmatched_deposit_id' => $locked->id, 'deposit_id' => $deposit->id],
+                $request->user()->id
+            );
+
+            $locked->update([
+                'status'          => 'approved',
+                'matched_user_id' => $user->id,
+                'approved_by'     => $request->user()->id,
+                'approved_at'     => now(),
+            ]);
+
+            return $deposit;
+        });
+
+        if (!$deposit) {
+            return response()->json(['status' => 'error', 'message' => 'รายการนี้ดำเนินการแล้ว'], 400);
+        }
+
+        $unmatchedDeposit->refresh();
 
         // ← ★ เพิ่มตรงนี้ ระหว่าง update กับ แจ้ง Telegram ★
 
