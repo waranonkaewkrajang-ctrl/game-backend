@@ -20,6 +20,10 @@ return Application::configure(basePath: dirname(__DIR__))
         ->withMiddleware(function (Middleware $middleware): void {
         // เชื่อ header จาก nginx เพื่อให้ $request->ip() เห็น IP จริงของผู้เรียก
         $middleware->trustProxies(at: '*');
+
+        $middleware->alias([
+            'admin' => \App\Http\Middleware\EnsureAdmin::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
