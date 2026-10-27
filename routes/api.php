@@ -52,7 +52,7 @@ Route::post('/truewallet/webhook', [\App\Http\Controllers\Api\TrueWalletWebhookC
 // =====================================================
 //  GAME CALLBACK (ค่ายเกม AMB เรียกมา — Seamless Wallet)
 // =====================================================
-Route::prefix('game/callback')->group(function () {
+Route::prefix('game/callback')->middleware('amb.ip')->group(function () {
     Route::post('/checkBalance', [GameController::class, 'getBalance']);
     Route::post('/placeBets',    [GameController::class, 'bet']);
     Route::post('/settleBets',   [GameController::class, 'win']);

@@ -127,6 +127,15 @@ return [
             'path' => storage_path('logs/laravel.log'),
         ],
 
+        // ผลตรวจ IP ของ callback ค่ายเกม — 1 บรรทัด JSON ต่อ request (อ่านด้วย amb:callback-ip-report)
+        'amb_callback' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/amb-callback-ip.log'),
+            'level' => 'debug',
+            'days' => 30,
+            'formatter' => \Monolog\Formatter\JsonFormatter::class,
+        ],
+
     ],
 
 ];
