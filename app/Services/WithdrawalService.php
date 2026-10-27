@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Setting;
 use App\Models\User;
 use App\Models\Withdrawal;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class WithdrawalService
@@ -73,15 +74,22 @@ class WithdrawalService
 
     public function approve(Withdrawal $withdrawal, int $adminId): Withdrawal
     {
-        if ($withdrawal->status !== 'pending') {
-            throw new \Exception('รายการนี้ถูกดำเนินการแล้ว');
-        }
+        // 🔒 กันอนุมัติกับปฏิเสธชนกัน (โอนให้ลูกค้าแล้ว + คืนเครดิตอีก)
+        $withdrawal = DB::transaction(function () use ($withdrawal, $adminId) {
+            $locked = Withdrawal::whereKey($withdrawal->id)->lockForUpdate()->first();
 
-        $withdrawal->update([
-            'status'      => 'approved',
-            'approved_by' => $adminId,
-            'approved_at' => now(),
-        ]);
+            if (!$locked || $locked->status !== 'pending') {
+                throw new \Exception('รายการนี้ถูกดำเนินการแล้ว');
+            }
+
+            $locked->update([
+                'status'      => 'approved',
+                'approved_by' => $adminId,
+                'approved_at' => now(),
+            ]);
+
+            return $locked;
+        });
 
                 // 🆕 แจ้ง Sidebar อัพเดทจำนวน pending
         try {
@@ -94,25 +102,31 @@ class WithdrawalService
 
     public function reject(Withdrawal $withdrawal, int $adminId, string $reason): Withdrawal
     {
-        if ($withdrawal->status !== 'pending') {
-            throw new \Exception('รายการนี้ถูกดำเนินการแล้ว');
-        }
+        // 🔒 lock แถว + คืนเงิน/เปลี่ยนสถานะใน transaction เดียว (กันคืนเงินซ้ำ)
+        $withdrawal = DB::transaction(function () use ($withdrawal, $adminId, $reason) {
+            $locked = Withdrawal::whereKey($withdrawal->id)->lockForUpdate()->first();
 
-        $user = $withdrawal->user;
-        $this->walletService->deposit(
-            $user,
-            $withdrawal->amount,
-            'คืนเงินถอน #' . $withdrawal->reference_id,
-            ['withdrawal_id' => $withdrawal->id],
-            $adminId
-        );
+            if (!$locked || $locked->status !== 'pending') {
+                throw new \Exception('รายการนี้ถูกดำเนินการแล้ว');
+            }
 
-        $withdrawal->update([
-            'status'        => 'rejected',
-            'reject_reason' => $reason,
-            'approved_by'   => $adminId,
-            'approved_at'   => now(),
-        ]);
+            $this->walletService->deposit(
+                $locked->user,
+                $locked->amount,
+                'คืนเงินถอน #' . $locked->reference_id,
+                ['withdrawal_id' => $locked->id],
+                $adminId
+            );
+
+            $locked->update([
+                'status'        => 'rejected',
+                'reject_reason' => $reason,
+                'approved_by'   => $adminId,
+                'approved_at'   => now(),
+            ]);
+
+            return $locked;
+        });
 
                 // 🆕 แจ้ง Sidebar อัพเดทจำนวน pending
         try {
