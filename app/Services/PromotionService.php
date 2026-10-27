@@ -86,25 +86,28 @@ class PromotionService
             2
         );
 
+        // เติมโบนัส + สร้าง claim เดียวใน transaction เดียว (เดิมสร้าง claim ซ้อน 2 ก้อน)
         $this->walletService->addBonus(
             $user,
             (float) $bonusAmount,
             "โบนัส: {$promotion->title}",
-            ['promotion_id' => $promotion->id, 'deposit_id' => $deposit->id]
+            ['promotion_id' => $promotion->id, 'deposit_id' => $deposit->id],
+            null,
+            [
+                'type'                => 'deposit_bonus',
+                'promotion_id'        => $promotion->id,
+                'deposit_id'          => $deposit->id,
+                'turnover_multiplier' => (float) $promotion->turnover_multiplier,
+                'turnover_required'   => $turnoverRequired,
+                'allowed_categories'  => $promotion->allowed_categories ?? null,
+                'allowed_providers'   => $promotion->allowed_providers ?? null,
+                'allowed_games'       => $promotion->allowed_games ?? null,
+            ],
         );
 
-        return PromotionClaim::create([
-            'user_id'            => $user->id,
-            'promotion_id'       => $promotion->id,
-            'deposit_id'         => $deposit->id,
-            'bonus_amount'       => $bonusAmount,
-            'turnover_required'  => $turnoverRequired,
-            'turnover_current'   => 0,
-            'turnover_completed' => false,
-            'status'             => 'active',
-            'allowed_categories' => $promotion->allowed_categories ?? null,
-            'allowed_providers'  => $promotion->allowed_providers ?? null,
-            'allowed_games'      => $promotion->allowed_games ?? null,
-        ]);
+        return PromotionClaim::where('deposit_id', $deposit->id)
+            ->where('promotion_id', $promotion->id)
+            ->latest('id')
+            ->first();
     }
 }

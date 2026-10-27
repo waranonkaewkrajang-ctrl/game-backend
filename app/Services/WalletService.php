@@ -182,6 +182,10 @@ class WalletService
  *   - deposit_id          : int|null
  *   - expired_at          : string|null (เช่น '2026-09-01 23:59:59')
  *   - note                : string|null
+ *   - turnover_required   : string|null (โปรกำหนดยอดเทิร์นเอง — ไม่ส่ง → amount × multiplier)
+ *
+ * โบนัสจากโปร (ส่ง promotion_id) สร้าง claim เสมอ ไว้นับสิทธิ์ใน canClaim()
+ * ถ้ายอดเทิร์นเป็น 0 จะสร้างเป็น completed ทันที (ไม่บล็อกการถอน)
  */
 public function addBonus(
     User $user,
@@ -215,10 +219,15 @@ public function addBonus(
             'bonus_balance' => bcadd($wallet->bonus_balance, $amount, 2),
         ]);
 
-        // สร้าง PromotionClaim (ถ้า multiplier > 0)
-        $turnoverRequired = bcmul($amount, $multiplier, 2);
+        // สร้าง PromotionClaim (ถ้า multiplier > 0 หรือเป็นโบนัสจากโปร)
+        $turnoverRequired = isset($options['turnover_required'])
+            ? bcadd((string) $options['turnover_required'], '0', 2)
+            : bcmul($amount, $multiplier, 2);
 
-        if ($multiplier > 0) {
+        // ใช้เฉพาะโบนัสจากโปร — ผู้เรียกเดิม (ยอดเสีย/เครดิตฟรี) ได้ claim แบบเดิมทุกกรณี
+        $noTurnover = !empty($options['promotion_id']) && bccomp($turnoverRequired, '0', 2) <= 0;
+
+        if ($multiplier > 0 || !empty($options['promotion_id'])) {
             PromotionClaim::create([
                 'user_id'             => $user->id,
                 'promotion_id'        => $options['promotion_id'] ?? null,
@@ -228,8 +237,9 @@ public function addBonus(
                 'turnover_multiplier' => $multiplier,
                 'turnover_required'   => $turnoverRequired,
                 'turnover_current'    => 0,
-                'turnover_completed'  => false,
-                'status'              => 'active',
+                'turnover_completed'  => $noTurnover,
+                'status'              => $noTurnover ? 'completed' : 'active',
+                'completed_at'        => $noTurnover ? now() : null,
                 'granted_by'          => $adminId,
                 'expired_at'          => $expiredAt,
                 'note'                => $note,
