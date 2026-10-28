@@ -94,21 +94,7 @@ class GameController extends Controller
             $user->update(['amb_username' => $ambUsername]);
         }
         $isMobile = (bool) $request->input('isMobile', false);
-        $allowedHosts = [
-    'snake1168.online', 'testprimex.fun', 'sn168.live', 'snking.online',
-    'sn168go.online', 'sn11168.com', 'sn888.pro', 'sn888.my', 'sn888.blog',
-];
-$requested = (string) $request->input('callbackUrl', '');
-$callbackUrl = (string) config('app.client_url', '');
-if ($requested !== '') {
-    $host = parse_url($requested, PHP_URL_HOST);
-    if ($host && in_array(strtolower($host), $allowedHosts, true)) {
-        $callbackUrl = 'https://' . strtolower($host);
-    }
-}
-if ($callbackUrl === '') {
-    $callbackUrl = (string) config('app.url', '');
-}
+        $callbackUrl = (string) ($request->input('callbackUrl') ?? config('app.url', ''));
         $sessionToken = substr(md5(uniqid(mt_rand(), true)), 0, 20);
 
         try {
