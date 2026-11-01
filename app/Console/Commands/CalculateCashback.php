@@ -154,7 +154,7 @@ class CalculateCashback extends Command
             return;
         }
 
-        $cutoff = Carbon::today()->subDays($expireDays - 1);
+        $cutoff = Carbon::now()->subDays($expireDays);
 
         $expiredCount = Reward::where('status', 'pending')
             ->where('created_at', '<', $cutoff)
