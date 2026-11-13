@@ -159,5 +159,8 @@ trait CreatesMoneySchema
             $t->text('value')->nullable();
             $t->timestamps();
         });
+
+        // สมุดบัญชีเงินเข้า — ใช้ migration ตัวจริง (ทดสอบ migration ไปด้วย)
+        (require base_path('database/migrations/2026_11_13_000001_create_bank_incoming_txs_table.php'))->up();
     }
 }
