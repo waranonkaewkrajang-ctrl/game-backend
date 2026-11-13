@@ -38,6 +38,17 @@ class AdminUnmatchedDepositController extends Controller
             'tx_time'      => 'nullable|string|max:100',
         ]);
 
+        // 🔒 กันยอดค้างซ้ำ — ข้อความเงินเข้าเดิม (ยอด/เวลา/ผู้โอน/ธนาคาร เดียวกัน) บันทึกได้ครั้งเดียว
+        // (bot อ่านแชทเก่าซ้ำตอน restart / LINE หลุด) ตอบ 200 ไม่ใช่ 201 = ไม่ได้สร้างใหม่
+        $existing = UnmatchedDeposit::where('amount', $data['amount'])
+            ->where('tx_time', $data['tx_time'] ?? null)
+            ->where('from_account', $data['from_account'] ?? null)
+            ->where('bank', $data['bank'] ?? null)
+            ->first();
+        if ($existing) {
+            return response()->json(['status' => 'success', 'duplicate' => true, 'data' => $existing], 200);
+        }
+
         $item = UnmatchedDeposit::create($data);
         // ยิง event อัพเดท badge ยอดค้าง
         $pendingCount = UnmatchedDeposit::where('status', 'pending')->count();
@@ -112,6 +123,13 @@ class AdminUnmatchedDepositController extends Controller
                 'matched_user_id' => $user->id,
                 'approved_by'     => $request->user()->id,
                 'approved_at'     => now(),
+            ]);
+
+            // สมุดบัญชีเงินเข้า: เงินก้อนนี้ถูกแอดมินจับคู่แล้ว (ผูก deposit ใหม่ — unique กันใช้ซ้ำ)
+            \App\Models\BankIncomingTx::where('unmatched_deposit_id', $locked->id)->whereNull('deposit_id')->update([
+                'status'       => 'manual_approved',
+                'deposit_id'   => $deposit->id,
+                'processed_at' => now(),
             ]);
 
             return $deposit;

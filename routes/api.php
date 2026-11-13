@@ -297,6 +297,12 @@ Route::prefix('admin')->group(function () {
         Route::post('/unmatched-deposits/{unmatchedDeposit}/approve', [\App\Http\Controllers\Admin\AdminUnmatchedDepositController::class, 'approve']);
         Route::post('/unmatched-deposits/{unmatchedDeposit}/reject', [\App\Http\Controllers\Admin\AdminUnmatchedDepositController::class, 'reject']);
 
+        // Bank incoming (เงินเข้าจาก bot LINE ธนาคาร — กันซ้ำ + จับคู่ฝั่งเซิร์ฟเวอร์)
+        Route::post('/bank-incoming',        [\App\Http\Controllers\Admin\AdminBankIncomingController::class, 'ingest']);
+        Route::get('/bank-incoming',         [\App\Http\Controllers\Admin\AdminBankIncomingController::class, 'index']);
+        Route::get('/bank-incoming/status',  [\App\Http\Controllers\Admin\AdminBankIncomingController::class, 'status']);
+        Route::post('/bank-incoming/resume', [\App\Http\Controllers\Admin\AdminBankIncomingController::class, 'resume']);
+
         // เพิ่ม Route สำหรับจัดการแอดมิน
         Route::get('/admins', [AdminUserController::class, 'getAdmins']); // ดูรายชื่อแอดมิน
         Route::post('/admins', [AdminUserController::class, 'storeAdmin']); // เพิ่มแอดมิน
