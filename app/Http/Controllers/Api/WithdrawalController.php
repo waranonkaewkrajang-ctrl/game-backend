@@ -27,6 +27,8 @@ class WithdrawalController extends Controller
             // ยิง event อัพเดท badge ถอนเงิน
             $pendingCount = \App\Models\Withdrawal::where('status', 'pending')->count();
             event(new \App\Events\AdminBadgeUpdated('withdrawal', $pendingCount));
+            // 🆕 การ์ด LINE "กำลังตรวจสอบ" (ส่งหลังตอบลูกค้า, ไม่ throw)
+            app(\App\Services\LineWithdrawNotifier::class)->notify($withdrawal, \App\Services\LineWithdrawNotifier::PENDING);
             return response()->json([
                 'status'  => 'success',
                 'message' => 'สร้างคำขอถอนเงินสำเร็จ',

@@ -83,6 +83,8 @@ class AdminWithdrawalController extends Controller
             $withdrawal = $this->withdrawalService->approve($withdrawal, $request->user()->id);
             $withdrawal->update(['processing_by' => null, 'processing_at' => null]);
             app(\App\Services\TelegramService::class)->notifyWithdraw($withdrawal->user->username, $withdrawal->amount);
+            // 🆕 การ์ด LINE "แจ้งถอนสำเร็จ" (ส่งหลังตอบแอดมิน, ไม่ throw)
+            app(\App\Services\LineWithdrawNotifier::class)->notify($withdrawal, \App\Services\LineWithdrawNotifier::APPROVED);
             return response()->json([
                 'status'  => 'success',
                 'message' => 'อนุมัติถอนเงินสำเร็จ',
@@ -106,6 +108,8 @@ class AdminWithdrawalController extends Controller
         try {
             $withdrawal = $this->withdrawalService->reject($withdrawal, $request->user()->id, $data['reason']);
             $withdrawal->update(['processing_by' => null, 'processing_at' => null]);
+            // 🆕 การ์ด LINE "คืนเครดิตเข้ายูสแล้ว" (ส่งหลังตอบแอดมิน, ไม่ throw)
+            app(\App\Services\LineWithdrawNotifier::class)->notify($withdrawal, \App\Services\LineWithdrawNotifier::REFUNDED);
             return response()->json([
                 'status'  => 'success',
                 'message' => 'คืนเครดิตสำเร็จ',

@@ -71,7 +71,11 @@ Route::get('/contact-links', function () {
 // =====================================================
 //  USER ROUTES (ต้อง login)
 // =====================================================
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', \App\Http\Middleware\TrackMemberActivity::class])->group(function () {
+
+    // 🆕 ความยินยอมรับข่าวสาร (CRM) — การเปลี่ยนแปลงถูกส่งผ่าน outbox
+    Route::get('/member/marketing-consent', [\App\Http\Controllers\Api\MarketingConsentController::class, 'show']);
+    Route::put('/member/marketing-consent', [\App\Http\Controllers\Api\MarketingConsentController::class, 'update']);
 
     // Auth & 2FA
     Route::post('/auth/logout',      [AuthController::class, 'logout']);

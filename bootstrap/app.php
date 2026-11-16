@@ -4,6 +4,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -12,6 +13,10 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         channels: __DIR__.'/../routes/channels.php',
         health: '/up',
+        // Internal READ-ONLY admin API for the unified admin (separate file, additive)
+        then: function () {
+            Route::middleware('api')->prefix('api')->group(base_path('routes/internal-admin.php'));
+        },
     )
     ->withBroadcasting(
         __DIR__.'/../routes/channels.php',
@@ -25,6 +30,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => \App\Http\Middleware\EnsureAdmin::class,
             'amb.ip' => \App\Http\Middleware\VerifyAmbCallbackIp::class,
             'truewallet.sig' => \App\Http\Middleware\VerifyTrueWalletSignature::class,
+            'internal.service' => \App\Http\Middleware\AuthenticateInternalService::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

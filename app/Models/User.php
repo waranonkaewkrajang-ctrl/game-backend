@@ -15,7 +15,7 @@ class User extends Authenticatable
         'username', 'phone', 'password', 'full_name', 'line_id',
         'bank_code', 'bank_account', 'bank_name',
         'status', 'is_verified', 'referral_code', 'referred_by',
-        'last_login_ip', 'last_login_at', 'amb_username',
+        'last_login_ip', 'last_login_at', 'amb_username', 'last_activity_at',
     ];
 
     protected $hidden = ['password'];
@@ -23,6 +23,10 @@ class User extends Authenticatable
     protected $casts = [
         'is_verified'   => 'boolean',
         'last_login_at' => 'datetime',
+        'last_activity_at'          => 'datetime',
+        'marketing_sms_consent_at'  => 'datetime',
+        'marketing_line_consent_at' => 'datetime',
+        'marketing_opted_out_at'    => 'datetime',
     ];
 
     public function wallet()
