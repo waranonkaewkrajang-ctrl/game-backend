@@ -97,6 +97,8 @@ class InternalAdminWritesTest extends TestCase
         config(['services.internal_admin.writes_enabled' => false]);
         $d = $this->deposit(500);
         $this->postJson("/api/internal/admin/deposits/{$d->id}/approve", [], $this->headers())->assertStatus(403);
+        // without a valid token nothing about the switch is revealed
+        $this->postJson("/api/internal/admin/deposits/{$d->id}/approve", [], ['Accept' => 'application/json'])->assertStatus(401);
         $this->assertSame('pending', $d->fresh()->status);
         $this->assertSame(0, DB::table('internal_admin_operations')->count());
     }

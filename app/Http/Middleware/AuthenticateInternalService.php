@@ -21,18 +21,6 @@ class AuthenticateInternalService
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (! in_array($request->getMethod(), ['GET', 'HEAD'], true)) {
-            $route = $request->route();
-            $mw = $route ? $route->gatherMiddleware() : [];
-            $isWriteRoute = in_array('internal.actor', $mw, true) && in_array('internal.idempotent', $mw, true);
-            if (! $isWriteRoute) {
-                return response()->json(['message' => 'Method not allowed'], 405);
-            }
-            if (! config('services.internal_admin.writes_enabled')) {
-                return response()->json(['status' => 'error', 'message' => 'การแก้ไขข้อมูลจากหลังบ้านรวมยังปิดอยู่ (INTERNAL_ADMIN_WRITES_ENABLED)'], 403);
-            }
-        }
-
         $hashes = array_values(array_filter(array_map('trim', explode(',', (string) config('services.internal_admin.token_hashes')))));
         $plain = (string) $request->bearerToken();
         if ($hashes === [] || strlen($plain) < 32) {
@@ -53,6 +41,18 @@ class AuthenticateInternalService
         $allowed = array_values(array_filter(array_map('trim', explode(',', (string) config('services.internal_admin.allowed_ips')))));
         if ($allowed !== [] && ! in_array($request->ip(), $allowed, true)) {
             return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        if (! in_array($request->getMethod(), ['GET', 'HEAD'], true)) {
+            $route = $request->route();
+            $mw = $route ? $route->gatherMiddleware() : [];
+            $isWriteRoute = in_array('internal.actor', $mw, true) && in_array('internal.idempotent', $mw, true);
+            if (! $isWriteRoute) {
+                return response()->json(['message' => 'Method not allowed'], 405);
+            }
+            if (! config('services.internal_admin.writes_enabled')) {
+                return response()->json(['status' => 'error', 'message' => 'การแก้ไขข้อมูลจากหลังบ้านรวมยังปิดอยู่ (INTERNAL_ADMIN_WRITES_ENABLED)'], 403);
+            }
         }
 
         $actor = substr(preg_replace('/[^\w:.\-@]/u', '', (string) $request->header('X-Acting-Admin', '')), 0, 80);
