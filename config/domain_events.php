@@ -29,4 +29,11 @@ return [
         'write_every_minutes' => (int) env('MEMBER_ACTIVITY_WRITE_MINUTES', 5),
         'event_every_minutes' => (int) env('MEMBER_ACTIVITY_EVENT_MINUTES', 360),
     ],
+
+    // ตามลูกค้าด้วยการ์ดเกมที่เล่น (crm:publish-play) — เวลาเล่นล่าสุด + เกมที่เล่นบ่อย ส่งไป CRM
+    'play' => [
+        'games'               => (int) env('CRM_PLAY_GAMES', 5),             // จำนวนเกมที่ส่งต่อคน (1–9)
+        'scan_bets'           => (int) env('CRM_PLAY_SCAN_BETS', 300),       // ดูจากการเดิมพันล่าสุดกี่ครั้ง
+        'event_every_minutes' => (int) env('CRM_PLAY_EVENT_MINUTES', 360),   // ส่งซ้ำเมื่อรายชื่อเกมเดิม ทุกกี่นาที
+    ],
 ];
