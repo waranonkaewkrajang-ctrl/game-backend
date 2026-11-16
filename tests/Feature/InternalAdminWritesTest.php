@@ -291,6 +291,42 @@ class InternalAdminWritesTest extends TestCase
             DB::table('internal_admin_operations')->orderBy('idempotency_key')->pluck('idempotency_key')->all());
     }
 
+    public function test_transactions_list_total_and_stable_order(): void
+    {
+        $other = User::create([
+            'username' => 'member2', 'phone' => '0800000010', 'password' => 'x',
+            'bank_code' => 'SCB', 'bank_account' => '1234567891', 'bank_name' => 'Member Two',
+        ]);
+        $same = now()->subMinute()->startOfSecond();
+        $rows = [];
+        foreach (range(1, 7) as $i) {
+            $rows[] = [
+                'user_id' => $i % 2 ? $this->user->id : $other->id, 'reference_id' => 'TX-'.$i,
+                'type' => $i <= 4 ? 'bet' : 'deposit', 'direction' => 'debit', 'amount' => $i,
+                'balance_before' => 0, 'balance_after' => 0, 'status' => 'completed',
+                'processed_by' => $i === 3 ? 7 : null, 'created_at' => $same, 'updated_at' => $same, // all share one timestamp
+            ];
+        }
+        DB::table('transactions')->insert($rows);
+        $auth = ['Authorization' => 'Bearer '.self::TOKEN, 'Accept' => 'application/json'];
+
+        $all = $this->getJson('/api/internal/admin/transactions?per_page=3', $auth)->assertStatus(200);
+        $this->assertSame(7, $all->json('data.total'));
+        $this->assertSame(3, $all->json('data.last_page'));
+        $this->assertSame(4, $this->getJson('/api/internal/admin/transactions?type=bet', $auth)->json('data.total'));
+        // search still uses the joined count
+        $this->assertSame(3, $this->getJson('/api/internal/admin/transactions?search=member2', $auth)->json('data.total'));
+
+        // identical timestamps → pages must not repeat or skip rows (id tiebreaker)
+        $seen = [];
+        foreach ([1, 2, 3] as $page) {
+            foreach ($this->getJson("/api/internal/admin/transactions?per_page=3&page={$page}", $auth)->json('data.data') as $r) {
+                $seen[] = $r['reference_id'];
+            }
+        }
+        $this->assertSame(['TX-7', 'TX-6', 'TX-5', 'TX-4', 'TX-3', 'TX-2', 'TX-1'], $seen);
+    }
+
     public function test_every_internal_route_points_to_an_existing_controller_method(): void
     {
         $count = 0;
