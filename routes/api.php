@@ -80,6 +80,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\TrackMemberActivity::cla
     // Auth & 2FA
     Route::post('/auth/logout',      [AuthController::class, 'logout']);
     Route::get('/auth/me',           [AuthController::class, 'me']);
+    // avatar picked on the website's profile page (เดิมเก็บแค่ใน localStorage ของเบราว์เซอร์)
+    Route::put('/member/avatar', [\App\Http\Controllers\Api\MemberAvatarController::class, 'update'])->middleware('throttle:20,1');
     Route::post('/auth/2fa/enable',  [AuthController::class, 'enableTwoFactor']);
     Route::post('/auth/2fa/confirm', [AuthController::class, 'confirmTwoFactor']);
     Route::post('/auth/2fa/disable', [AuthController::class, 'disableTwoFactor']);
