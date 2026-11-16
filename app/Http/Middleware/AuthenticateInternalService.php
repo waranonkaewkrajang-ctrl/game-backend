@@ -37,6 +37,8 @@ class AuthenticateInternalService
         if (! $valid) {
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
+        // key for verifying the staff identity assertion (InternalActingAdmin) — never logged
+        $request->attributes->set('internal_token_hash', $given);
 
         $allowed = array_values(array_filter(array_map('trim', explode(',', (string) config('services.internal_admin.allowed_ips')))));
         if ($allowed !== [] && ! in_array($request->ip(), $allowed, true)) {

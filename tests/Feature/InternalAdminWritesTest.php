@@ -46,6 +46,7 @@ class InternalAdminWritesTest extends TestCase
             $t->timestamps();
         });
         (require base_path('database/migrations/2026_11_16_000001_create_internal_admin_operations_table.php'))->up();
+        (require base_path('database/migrations/2026_11_17_000001_create_internal_staff_admins_table.php'))->up();
 
         Http::fake();
         config([
@@ -67,16 +68,33 @@ class InternalAdminWritesTest extends TestCase
         Setting::create(['key' => 'default_turnover_multiplier', 'value' => '3']);
     }
 
-    private function headers(?string $key = 'key-0000000000000001', ?string $adminId = '7'): array
+    private const ALL_PERMS = ['game:finance:write', 'game:members:write', 'game:settings:write', 'game:promotions:write', 'game:games:write', 'game:admins:write'];
+
+    /** Signed staff identity assertion exactly as the NestJS admin API builds it. */
+    public static function assertion(int $staffId = 3, array $perms = self::ALL_PERMS, ?int $iat = null, int $ttl = 60, ?string $key = null): string
     {
-        $h = ['Authorization' => 'Bearer '.self::TOKEN, 'Accept' => 'application/json', 'X-Acting-Admin' => '3:staff01'];
+        $iat ??= time();
+        $payload = rtrim(strtr(base64_encode(json_encode(['sid' => $staffId, 'u' => 'staff'.$staffId, 'p' => $perms, 'iat' => $iat, 'exp' => $iat + $ttl])), '+/', '-_'), '=');
+
+        return $payload.'.'.hash_hmac('sha256', $payload, $key ?? hash('sha256', self::TOKEN));
+    }
+
+    private function headers(?string $key = 'key-0000000000000001', ?string $assertion = ''): array
+    {
+        $h = ['Authorization' => 'Bearer '.self::TOKEN, 'Accept' => 'application/json', 'X-Acting-Admin' => '3:staff3'];
         if ($key !== null) {
             $h['Idempotency-Key'] = $key;
         }
-        if ($adminId !== null) {
-            $h['X-Acting-Admin-Id'] = $adminId;
+        if ($assertion !== null) {
+            $h['X-Acting-Staff'] = $assertion === '' ? self::assertion() : $assertion;
         }
         return $h;
+    }
+
+    private function staffAdminId(int $staffId = 3): ?int
+    {
+        $id = DB::table('internal_staff_admins')->where('line_staff_id', $staffId)->value('admin_id');
+        return $id === null ? null : (int) $id;
     }
 
     private function deposit(float $amount): Deposit
@@ -103,19 +121,68 @@ class InternalAdminWritesTest extends TestCase
         $this->assertSame(0, DB::table('internal_admin_operations')->count());
     }
 
-    public function test_requires_service_token_and_a_linked_active_game_admin(): void
+    public function test_requires_service_token_and_a_valid_staff_assertion(): void
     {
         $d = $this->deposit(500);
         $url = "/api/internal/admin/deposits/{$d->id}/approve";
-        $this->postJson($url, [], ['Accept' => 'application/json', 'X-Acting-Admin-Id' => '7', 'Idempotency-Key' => 'key-0000000000000001'])->assertStatus(401);
-        $this->postJson($url, [], $this->headers('key-0000000000000001', null))->assertStatus(403);   // not linked
-        $this->postJson($url, [], $this->headers('key-0000000000000001', 'abc'))->assertStatus(403);
-        $this->postJson($url, [], $this->headers('key-0000000000000001', '8'))->assertStatus(403);    // disabled admin
-        $this->postJson($url, [], $this->headers('key-0000000000000001', '99'))->assertStatus(403);   // unknown admin
-        $this->postJson($url, [], $this->headers(null))->assertStatus(400);                             // no key
+        $this->postJson($url, [], ['Accept' => 'application/json', 'X-Acting-Staff' => self::assertion(), 'Idempotency-Key' => 'key-0000000000000001'])->assertStatus(401);
+        $this->postJson($url, [], $this->headers('key-0000000000000001', null))->assertStatus(403);                                   // no assertion
+        $this->postJson($url, [], $this->headers('key-0000000000000001', 'abc'))->assertStatus(403);                                  // garbage
+        $this->postJson($url, [], $this->headers('key-0000000000000001', self::assertion(key: 'wrong-key')))->assertStatus(403);      // forged signature
+        $this->postJson($url, [], $this->headers('key-0000000000000001', self::assertion(iat: time() - 600)))->assertStatus(403);     // expired
+        $this->postJson($url, [], $this->headers('key-0000000000000001', self::assertion(ttl: 3600)))->assertStatus(403);             // lifetime too long
+        $this->postJson($url, [], $this->headers('key-0000000000000001', self::assertion(perms: ['game:finance:read'])))->assertStatus(403); // read-only staff
+        $this->postJson($url, [], $this->headers('key-0000000000000001', self::assertion(perms: ['game:members:write'])))->assertStatus(403); // wrong area
+        $this->postJson($url, [], $this->headers(null))->assertStatus(400);                                                            // no key
         $this->postJson($url, [], $this->headers('short'))->assertStatus(400);
         $this->assertSame('pending', $d->fresh()->status);
         $this->assertSame('0.00', $this->balance());
+    }
+
+    public function test_each_staff_gets_their_own_game_admin_and_historical_admins_are_never_used(): void
+    {
+        $a = $this->deposit(100);
+        $b = $this->deposit(200);
+        $this->postJson("/api/internal/admin/deposits/{$a->id}/approve", [], $this->headers('staff-a-00000000001', self::assertion(7)))->assertStatus(200);
+        $this->postJson("/api/internal/admin/deposits/{$b->id}/approve", [], $this->headers('staff-b-00000000001', self::assertion(8)))->assertStatus(200);
+
+        // LINE staff 7 / 8 must NOT become game admins 7 / 8 just because the numbers match
+        $s7 = $this->staffAdminId(7);
+        $s8 = $this->staffAdminId(8);
+        $this->assertNotContains($s7, [7, 8]);
+        $this->assertNotContains($s8, [7, 8, $s7]);
+        $this->assertSame($s7, (int) $a->fresh()->approved_by);
+        $this->assertSame($s8, (int) $b->fresh()->approved_by);
+        $this->assertSame('line-staff-7', DB::table('admins')->where('id', $s7)->value('username'));
+        $this->assertSame('Disabled', DB::table('admins')->where('id', 8)->value('name'));   // historical rows untouched
+        $this->assertSame(4, DB::table('admins')->count());
+
+        // same staff again → same account, no duplicate
+        $c = $this->deposit(50);
+        $this->postJson("/api/internal/admin/deposits/{$c->id}/approve", [], $this->headers('staff-a-00000000002', self::assertion(7)))->assertStatus(200);
+        $this->assertSame($s7, (int) $c->fresh()->approved_by);
+        $this->assertSame(4, DB::table('admins')->count());
+
+        // a game super admin disables that account in the old panel → refused
+        DB::table('admins')->where('id', $s7)->update(['is_active' => false]);
+        $d = $this->deposit(70);
+        $this->postJson("/api/internal/admin/deposits/{$d->id}/approve", [], $this->headers('staff-a-00000000003', self::assertion(7)))->assertStatus(403);
+        $this->assertSame('pending', $d->fresh()->status);
+    }
+
+    public function test_every_write_route_has_a_required_permission(): void
+    {
+        $n = 0;
+        foreach (app('router')->getRoutes() as $route) {
+            if (! in_array('internal.actor', $route->gatherMiddleware(), true)) {
+                continue;
+            }
+            $req = \Illuminate\Http\Request::create('/'.$route->uri(), $route->methods()[0]);
+            $req->setRouteResolver(fn () => $route);
+            $this->assertNotNull(\App\Http\Middleware\InternalActingAdmin::requiredPermission($req), $route->uri());
+            $n++;
+        }
+        $this->assertGreaterThan(50, $n);
     }
 
     public function test_approve_deposit_records_the_game_admin_and_replay_does_not_credit_twice(): void
@@ -126,7 +193,7 @@ class InternalAdminWritesTest extends TestCase
         $first = $this->postJson($url, [], $this->headers('approve-dep-000000001'));
         $first->assertStatus(200)->assertJsonPath('status', 'success');
         $this->assertSame('approved', $d->fresh()->status);
-        $this->assertSame(7, (int) $d->fresh()->approved_by);
+        $this->assertSame($this->staffAdminId(), (int) $d->fresh()->approved_by);
         $this->assertSame('500.00', $this->balance());
 
         // network retry with the SAME key → stored answer, action not run again
@@ -160,11 +227,12 @@ class InternalAdminWritesTest extends TestCase
     {
         $url = "/api/internal/admin/users/{$this->user->id}/adjust";
         $body = ['amount' => 50, 'description' => 'x'];
+        $adminId = \App\Http\Middleware\InternalActingAdmin::adminFor(3, 'staff3')->id;
         $hash = \App\Http\Middleware\InternalIdempotency::requestHash(
-            \Illuminate\Http\Request::create($url, 'POST', $body), 7
+            \Illuminate\Http\Request::create($url, 'POST', $body), $adminId
         );
         DB::table('internal_admin_operations')->insert([
-            'idempotency_key' => 'inflight-0000000001', 'admin_id' => 7, 'method' => 'POST', 'path' => ltrim($url, '/'),
+            'idempotency_key' => 'inflight-0000000001', 'admin_id' => $adminId, 'method' => 'POST', 'path' => ltrim($url, '/'),
             'request_hash' => $hash, 'status' => 'processing', 'created_at' => now(), 'updated_at' => now(),
         ]);
         $this->postJson($url, $body, $this->headers('inflight-0000000001'))->assertStatus(409);

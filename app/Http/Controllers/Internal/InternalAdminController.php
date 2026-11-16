@@ -86,7 +86,8 @@ class InternalAdminController extends Controller
             ->join('users', 'transactions.user_id', '=', 'users.id')
             ->leftJoin('admins', 'transactions.processed_by', '=', 'admins.id')
             ->select('transactions.*', 'users.username', 'users.phone', 'admins.name as admin_name')
-            ->orderBy('transactions.created_at', 'desc');
+            ->orderBy('transactions.created_at', 'desc')
+            ->orderBy('transactions.id', 'desc'); // stable pages: many rows share the same created_at
         if ($request->filled('type')) {
             $query->where('transactions.type', $request->type);
         }
@@ -126,7 +127,7 @@ class InternalAdminController extends Controller
 
     public function gameLogs(Request $request): JsonResponse
     {
-        $query = GameLog::with('user')->orderBy('created_at', 'desc');
+        $query = GameLog::with('user')->orderBy('created_at', 'desc')->orderBy('id', 'desc'); // stable pages
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where('game_name', 'like', "%{$search}%")
