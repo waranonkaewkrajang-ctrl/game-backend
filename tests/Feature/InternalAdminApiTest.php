@@ -76,9 +76,11 @@ class InternalAdminApiTest extends TestCase
 
     public function test_read_only_and_whitelisted(): void
     {
-        $this->postJson('/api/internal/admin/banners', [], $this->auth())->assertStatus(405);
-        $this->getJson('/api/internal/admin/settings', $this->auth())->assertStatus(404); // contains the Telegram bot token
-        $this->postJson('/api/internal/admin/deposits/1/approve', [], $this->auth())->assertStatus(404);
+        // writes exist only in the write group and stay closed while INTERNAL_ADMIN_WRITES_ENABLED is off (default)
+        $this->postJson('/api/internal/admin/banners', [], $this->auth())->assertStatus(403);
+        $this->postJson('/api/internal/admin/deposits/1/approve', [], $this->auth())->assertStatus(403);
+        $this->putJson('/api/internal/admin/dashboard', [], $this->auth())->assertStatus(405); // read route: never writable
+        $this->postJson('/api/internal/admin/api-tokens', [], $this->auth())->assertStatus(404); // credentials: not exposed
         $this->getJson('/api/internal/admin/users/abc', $this->auth())->assertStatus(404);
     }
 

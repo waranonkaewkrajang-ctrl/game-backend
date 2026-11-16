@@ -31,7 +31,14 @@ return Application::configure(basePath: dirname(__DIR__))
             'amb.ip' => \App\Http\Middleware\VerifyAmbCallbackIp::class,
             'truewallet.sig' => \App\Http\Middleware\VerifyTrueWalletSignature::class,
             'internal.service' => \App\Http\Middleware\AuthenticateInternalService::class,
+            'internal.actor' => \App\Http\Middleware\InternalActingAdmin::class,
+            'internal.idempotent' => \App\Http\Middleware\InternalIdempotency::class,
         ]);
+        // internal API: check the service token BEFORE route-model binding touches the database
+        $middleware->prependToPriorityList(
+            before: \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            prepend: \App\Http\Middleware\AuthenticateInternalService::class,
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

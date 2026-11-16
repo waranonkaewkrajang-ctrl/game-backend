@@ -34,6 +34,12 @@ return [
         'allowed_ips'  => env('INTERNAL_ADMIN_ALLOWED_IPS', ''),
         'per_minute'   => (int) env('INTERNAL_ADMIN_PER_MINUTE', 300),
         'log_channel'  => env('INTERNAL_ADMIN_LOG_CHANNEL', 'stack'),
+        // write actions (approve/reject/adjust/settings…) — kill switch, OFF unless explicitly enabled
+        'writes_enabled' => filter_var(env('INTERNAL_ADMIN_WRITES_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+        // setting keys whose value is never sent to the unified admin (comma separated substrings, case-insensitive)
+        'secret_setting_patterns' => env('INTERNAL_ADMIN_SECRET_SETTING_PATTERNS', 'token,secret,password,passwd,api_key,apikey,private'),
+        // how long finished idempotent operations are kept (days)
+        'idempotency_keep_days' => (int) env('INTERNAL_ADMIN_IDEMPOTENCY_KEEP_DAYS', 30),
     ],
 
     // 🆕 แจ้งสถานะถอนเป็นการ์ด LINE (admin-api /withdraw-notify/events) — ว่าง = ปิด

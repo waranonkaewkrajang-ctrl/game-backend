@@ -13,7 +13,8 @@ use Symfony\Component\HttpFoundation\Response;
  * - Token in "Authorization: Bearer <token>" only (never query/body). Stored as SHA-256 hashes in env
  *   (INTERNAL_ADMIN_TOKEN_HASHES, comma separated) → no DB schema change, rotate by adding a new hash first.
  * - Optional IP allowlist (INTERNAL_ADMIN_ALLOWED_IPS, comma separated).
- * - GET/HEAD only, regardless of the route list.
+ * - GET/HEAD by default. Write methods only when INTERNAL_ADMIN_WRITES_ENABLED=true AND the matched route is
+ *   in the write group (middleware internal.actor + internal.idempotent → real game admin + Idempotency-Key).
  * - Logs who acted (X-Acting-Admin from the unified admin) without logging the token.
  */
 class AuthenticateInternalService
@@ -21,7 +22,15 @@ class AuthenticateInternalService
     public function handle(Request $request, Closure $next): Response
     {
         if (! in_array($request->getMethod(), ['GET', 'HEAD'], true)) {
-            return response()->json(['message' => 'Method not allowed'], 405);
+            $route = $request->route();
+            $mw = $route ? $route->gatherMiddleware() : [];
+            $isWriteRoute = in_array('internal.actor', $mw, true) && in_array('internal.idempotent', $mw, true);
+            if (! $isWriteRoute) {
+                return response()->json(['message' => 'Method not allowed'], 405);
+            }
+            if (! config('services.internal_admin.writes_enabled')) {
+                return response()->json(['status' => 'error', 'message' => 'การแก้ไขข้อมูลจากหลังบ้านรวมยังปิดอยู่ (INTERNAL_ADMIN_WRITES_ENABLED)'], 403);
+            }
         }
 
         $hashes = array_values(array_filter(array_map('trim', explode(',', (string) config('services.internal_admin.token_hashes')))));
