@@ -156,6 +156,9 @@ class InternalAdminWritesTest extends TestCase
         $this->assertSame('line-staff-7', DB::table('admins')->where('id', $s7)->value('username'));
         $this->assertSame('Disabled', DB::table('admins')->where('id', 8)->value('name'));   // historical rows untouched
         $this->assertSame(4, DB::table('admins')->count());
+        // the game admins list (old controller) still works with the auto-created accounts in it
+        $this->getJson('/api/internal/admin/admins', ['Authorization' => 'Bearer '.self::TOKEN, 'Accept' => 'application/json'])
+            ->assertStatus(200)->assertJsonFragment(['username' => 'line-staff-7', 'permissions' => []]);
 
         // same staff again → same account, no duplicate
         $c = $this->deposit(50);

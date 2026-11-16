@@ -150,7 +150,9 @@ class InternalActingAdmin
                     'password'    => Hash::make(Str::random(64)), // nobody knows it → cannot log in to the old panel
                     'name'        => Str::limit('LINE: '.($username !== '' ? $username : '#'.$staffId), 100, ''),
                     'role'        => 'staff',
-                    'permissions' => [],
+                    // same stored format as AdminUserController::storeAdmin (json_encode through the array cast →
+                    // a JSON string); getAdmins() json_decodes it again and breaks on a plain JSON array
+                    'permissions' => json_encode([]),
                     'is_active'   => true,
                 ]);
                 DB::table('internal_staff_admins')->insert([
