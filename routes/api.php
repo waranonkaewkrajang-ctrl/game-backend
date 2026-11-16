@@ -259,6 +259,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\TrackMemberActivity::cla
                 'amounts'      => $amounts,
                 'truewallet_accounts' => json_decode($settings['truewallet_accounts'] ?? '[]', true) ?: [],
                 'ranks' => json_decode(\App\Models\Setting::getValue('ranks', '[]'), true) ?: [],
+                // ปิดปรับปรุงถอนเงิน: {enabled, title, message} — popup on the customer withdraw button
+                'withdraw_maintenance' => \App\Support\WithdrawMaintenance::state(),
             ],
         ]);
     });

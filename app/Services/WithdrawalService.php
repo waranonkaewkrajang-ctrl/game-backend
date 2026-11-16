@@ -16,6 +16,12 @@ class WithdrawalService
 
     public function createRequest(User $user, float $amount): Withdrawal
     {
+        // ปิดปรับปรุงถอนเงิน (ตั้งค่าการเงิน) — checked first, before any amount / balance rule
+        $maintenance = \App\Support\WithdrawMaintenance::state();
+        if ($maintenance['enabled']) {
+            throw new \App\Support\WithdrawMaintenanceException($maintenance['title'], $maintenance['message']);
+        }
+
         $minWithdraw = (float) Setting::getValue('min_withdraw', 100);
         $maxWithdraw = (float) Setting::getValue('max_withdraw', 200000);
 

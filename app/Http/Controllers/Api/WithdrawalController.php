@@ -34,6 +34,14 @@ class WithdrawalController extends Controller
                 'message' => 'สร้างคำขอถอนเงินสำเร็จ',
                 'data'    => $withdrawal,
             ], 201);
+        } catch (\App\Support\WithdrawMaintenanceException $e) {
+            // the customer site shows this as the "ปิดปรับปรุง" popup
+            return response()->json([
+                'status'  => 'error',
+                'code'    => 'withdraw_maintenance',
+                'title'   => $e->title,
+                'message' => $e->getMessage(),
+            ], 400);
         } catch (\Exception $e) {
             return response()->json([
                 'status'  => 'error',
