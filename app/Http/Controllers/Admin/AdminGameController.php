@@ -184,7 +184,12 @@ class AdminGameController extends Controller
         ]);
 
         $file = $request->file('image');
-        $filename = 'provider_' . strtolower($request->product_id) . '.' . $file->getClientOriginalExtension();
+        // ชื่อไฟล์ใหม่ทุกครั้ง: เดิมใช้ชื่อเดิมทับ (provider_jili.png) → URL ไม่เปลี่ยน + เว็บ cache รูป 30 วัน
+        // → หลังบ้าน/หน้าเว็บลูกค้ายังเห็นรูปเก่า ทั้งที่ขึ้น "สำเร็จ" · ไฟล์เก่าเก็บไว้ (หน้าที่เปิดค้างยังโหลดได้)
+        // product_id กรองเหลือ a-z0-9_- กันชื่อไฟล์แปลก/../ · นามสกุลจากชนิดไฟล์จริง (ผ่าน mimes แล้ว)
+        $safeId = preg_replace('/[^a-z0-9_-]/', '', strtolower((string) $request->product_id)) ?: 'provider';
+        $ext = strtolower($file->guessExtension() ?: $file->getClientOriginalExtension());
+        $filename = 'provider_' . $safeId . '_' . now()->format('YmdHis') . '_' . substr(bin2hex(random_bytes(3)), 0, 6) . '.' . $ext;
         $file->move(public_path('uploads/providers'), $filename);
         $imageUrl = '/uploads/providers/' . $filename;
 
