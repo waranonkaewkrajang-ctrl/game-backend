@@ -71,7 +71,7 @@ class CalculateCashback extends Command
 
             // === 1. คำนวณ Cashback (คืนยอดเสียให้ตัวเอง) ===
             if ($cashbackPercent > 0) {
-                $cashback = round($loss * ($cashbackPercent / 100), 2);
+                $cashback = self::percentOf($loss, $cashbackPercent);
 
                 if ($cashback >= 1) {
                     try {
@@ -106,7 +106,7 @@ class CalculateCashback extends Command
                 $referrer = User::find($user->referred_by);
 
                 if ($referrer && $referrer->isActive()) {
-                    $commission = round($loss * ($referralPercent / 100), 2);
+                    $commission = self::percentOf($loss, $referralPercent);
 
                     if ($commission >= 1) {
                         try {
@@ -142,6 +142,16 @@ class CalculateCashback extends Command
         $this->info("--- สรุป ---");
         $this->info("Cashback: {$cashbackCount} คน รวม ฿{$cashbackTotal}");
         $this->info("Referral: {$referralCount} คน รวม ฿{$referralTotal}");
+    }
+
+    /**
+     * % ของยอดเงิน ปัดครึ่งขึ้นที่ 2 ตำแหน่ง คิดเป็นสตางค์ (จำนวนเต็ม)
+     * เดิม round($loss * 0.05, 2) ให้ 154.70 × 5% = 7.73 เพราะ 7.735 เก็บในทศนิยมเป็น 7.73499… → ตอนนี้ได้ 7.74
+     */
+    public static function percentOf(float $amount, float $percent): float
+    {
+        $satang = (int) round($amount * 100);
+        return round(round($satang * $percent, 6) / 100) / 100;
     }
 
     /**
