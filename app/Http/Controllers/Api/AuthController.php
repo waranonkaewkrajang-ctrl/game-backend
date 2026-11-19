@@ -79,9 +79,16 @@ class AuthController extends Controller
         }
 
         $referredBy = null;
-        if (!empty($data['referral_code'])) {
-            $referrer = User::where('referral_code', $data['referral_code'])->first();
-            $referredBy = $referrer?->id;
+        $referralCode = strtoupper(trim((string) ($data['referral_code'] ?? '')));
+        if ($referralCode !== '') {
+            $referrer = User::where('referral_code', $referralCode)->first();
+            if (!$referrer) {
+                // เดิมรหัสผิดก็สมัครผ่านเงียบ ๆ โดยไม่ผูกผู้แนะนำ → ทั้งเพื่อนและผู้แนะนำไม่รู้ว่าไม่ได้ผูก
+                throw ValidationException::withMessages([
+                    'referral_code' => 'ไม่พบรหัสแนะนำนี้ กรุณาตรวจสอบอีกครั้ง หรือเว้นว่างไว้',
+                ]);
+            }
+            $referredBy = $referrer->id;
         }
 
         $user = User::create([

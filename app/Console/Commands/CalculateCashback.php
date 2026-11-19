@@ -24,21 +24,22 @@ class CalculateCashback extends Command
 
         $cashbackPercent = (float) Setting::getValue('cashback_percent', 0);
         $referralPercent = (float) Setting::getValue('referral_percent', 0);
-        $expireDays = (int) Setting::getValue('reward_expire_days', 0);
+        $day = $date->toDateString();
 
-        $this->info("วันที่ {$date->toDateString()} | คืนยอดเสีย {$cashbackPercent}% | ค่าแนะนำ {$referralPercent}% | หมดอายุ {$expireDays} วัน");
+        $this->info("วันที่ {$day} | คืนยอดเสีย {$cashbackPercent}% | ค่าแนะนำ {$referralPercent}% | หมดอายุ ยอดเสีย " . Reward::expireDaysFor('cashback') . " วัน / ค่าแนะนำ " . Reward::expireDaysFor('referral') . " วัน");
 
-        // === ลบรางวัลที่หมดอายุ ===
-        $this->expireOldRewards($expireDays);
+        // === เปลี่ยนรางวัลที่หมดอายุ (เกณฑ์เดียวกับ rewards:expire) ===
+        $done = Reward::expireStale();
+        $this->line("  [Expire] ค่าแนะนำ {$done['referral']} รายการ, อื่น ๆ {$done['other']} รายการ");
 
-        // เช็คว่าคำนวณวันนี้ไปแล้วหรือยัง (กัน duplicate)
-        $alreadyCalculated = Reward::where('type', 'cashback')
-            ->whereJsonContains('meta->date', $date->toDateString())
-            ->exists();
-
-        if ($alreadyCalculated) {
-            $this->warn("วันที่ {$date->toDateString()} คำนวณไปแล้ว — ข้าม");
-            return;
+        // กันจ่ายซ้ำ: เช็คทีละรายการ (ลูกค้า+วัน สำหรับยอดเสีย, ผู้แนะนำ+เพื่อน+วัน สำหรับค่าแนะนำ)
+        // เดิมเช็คแค่ "มี cashback ของวันนี้แล้วหรือยัง" — วันที่ไม่มีใครได้ยอดเสียเลย รันซ้ำแล้วค่าแนะนำถูกสร้างซ้ำ
+        $cashbackDone = Reward::where('type', 'cashback')->where('meta->date', $day)->pluck('user_id')->flip();
+        $referralDone = Reward::where('type', 'referral')->where('meta->date', $day)
+            ->get(['user_id', 'meta'])
+            ->mapWithKeys(fn ($r) => [$r->user_id . ':' . ($r->meta['from_user_id'] ?? '') => true]);
+        if ($cashbackDone->isNotEmpty() || $referralDone->isNotEmpty()) {
+            $this->warn("วันที่ {$day} เคยคำนวณแล้วบางส่วน — สร้างเฉพาะรายการที่ยังไม่มี");
         }
 
         $users = User::where('status', 'active')->get();
@@ -70,7 +71,7 @@ class CalculateCashback extends Command
             if ($loss <= 0) continue;
 
             // === 1. คำนวณ Cashback (คืนยอดเสียให้ตัวเอง) ===
-            if ($cashbackPercent > 0) {
+            if ($cashbackPercent > 0 && !$cashbackDone->has($user->id)) {
                 $cashback = self::percentOf($loss, $cashbackPercent);
 
                 if ($cashback >= 1) {
@@ -105,7 +106,7 @@ class CalculateCashback extends Command
             if ($referralPercent > 0 && $user->referred_by) {
                 $referrer = User::find($user->referred_by);
 
-                if ($referrer && $referrer->isActive()) {
+                if ($referrer && $referrer->isActive() && !$referralDone->has($referrer->id . ':' . $user->id)) {
                     $commission = self::percentOf($loss, $referralPercent);
 
                     if ($commission >= 1) {
@@ -152,28 +153,5 @@ class CalculateCashback extends Command
     {
         $satang = (int) round($amount * 100);
         return round(round($satang * $percent, 6) / 100) / 100;
-    }
-
-    /**
-     * เปลี่ยนรางวัลที่เกินกำหนดเป็น expired
-     */
-    private function expireOldRewards(int $expireDays): void
-    {
-        if ($expireDays <= 0) {
-            $this->line("  [Expire] ไม่ได้ตั้งวันหมดอายุ — ข้าม");
-            return;
-        }
-
-        $cutoff = Carbon::now()->subDays($expireDays);
-
-        $expiredCount = Reward::where('status', 'pending')
-            ->where('created_at', '<', $cutoff)
-            ->update(['status' => 'expired']);
-
-        if ($expiredCount > 0) {
-            $this->line("  [Expire] ลบรางวัลหมดอายุ {$expiredCount} รายการ (เกิน {$expireDays} วัน)");
-        } else {
-            $this->line("  [Expire] ไม่มีรางวัลหมดอายุ");
-        }
     }
 }

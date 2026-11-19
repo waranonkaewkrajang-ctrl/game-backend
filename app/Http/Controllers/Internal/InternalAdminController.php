@@ -126,10 +126,60 @@ class InternalAdminController extends Controller
         $query = User::withCount(['referrals as referred_count'])->orderBy('referred_count', 'desc');
         if ($request->filled('search')) {
             $search = $request->search;
-            $query->where('username', 'like', "%{$search}%")
+            $query->where(function ($q) use ($search) {
+                $q->where('username', 'like', "%{$search}%")
                   ->orWhere('referral_code', 'like', "%{$search}%");
+            });
         }
-        return response()->json(['data' => $query->paginate(50)]);
+        $page = $query->paginate(50);
+
+        // เพื่อนของผู้แนะนำในหน้านี้ + สัญญาณ "อาจชวนตัวเอง" (แจ้งเตือนอย่างเดียว ไม่บล็อก)
+        $ids = $page->getCollection()->where('referred_count', '>', 0)->pluck('id');
+        $friends = $ids->isEmpty() ? collect() : User::whereIn('referred_by', $ids)
+            ->orderBy('created_at', 'desc')
+            ->get(['id', 'username', 'referred_by', 'status', 'bank_name', 'full_name', 'last_login_ip', 'created_at'])
+            ->groupBy('referred_by');
+
+        $page->getCollection()->transform(function (User $u) use ($friends) {
+            $list = ($friends[$u->id] ?? collect())->map(fn (User $f) => [
+                'id'         => $f->id,
+                'username'   => $f->username,
+                'status'     => $f->status,
+                'created_at' => $f->created_at,
+                'flags'      => self::referralFlags($u, $f),
+            ])->values();
+            $u->setAttribute('friends', $list);
+            $u->setAttribute('flagged_count', $list->filter(fn ($f) => count($f['flags']) > 0)->count());
+            return $u;
+        });
+
+        return response()->json(['data' => $page]);
+    }
+
+    /**
+     * จุดที่ผู้แนะนำกับเพื่อนซ้ำกัน — ชื่อบัญชีธนาคาร / ชื่อจริง / IP ล่าสุด
+     * (ระบบเก็บแค่ IP ล่าสุดของแต่ละคน จึงเป็นสัญญาณให้แอดมินตรวจต่อ ไม่ใช่หลักฐาน)
+     *
+     * @return list<string>
+     */
+    public static function referralFlags(User $referrer, User $friend): array
+    {
+        $norm = function (?string $name): string {
+            $n = mb_strtolower(trim((string) $name));
+            $n = preg_replace('/^(นาย|นางสาว|นาง|น\.ส\.|mr\.?|mrs\.?|ms\.?|miss)\s*/u', '', $n);
+            return preg_replace('/\s+/u', '', $n);
+        };
+        $flags = [];
+        if ($norm($referrer->bank_name) !== '' && $norm($referrer->bank_name) === $norm($friend->bank_name)) {
+            $flags[] = 'same_bank_name';
+        }
+        if ($norm($referrer->full_name) !== '' && $norm($referrer->full_name) === $norm($friend->full_name)) {
+            $flags[] = 'same_full_name';
+        }
+        if ($referrer->last_login_ip && $referrer->last_login_ip === $friend->last_login_ip) {
+            $flags[] = 'same_ip';
+        }
+        return $flags;
     }
 
     public function gameLogs(Request $request): JsonResponse

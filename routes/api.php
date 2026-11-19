@@ -187,6 +187,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\TrackMemberActivity::cla
     Route::post('/rewards/claim/cashback', [\App\Http\Controllers\Api\RewardController::class, 'claimCashback']);
     Route::post('/rewards/claim/referral', [\App\Http\Controllers\Api\RewardController::class, 'claimReferral']);
     Route::get('/rewards/history', [\App\Http\Controllers\Api\RewardController::class, 'history']);
+    Route::get('/rewards/referral/friends', [\App\Http\Controllers\Api\RewardController::class, 'referralFriends']);
 
     // === User Rank ===
     Route::get('/user/rank', function (\Illuminate\Http\Request $request) {
@@ -465,16 +466,7 @@ Route::prefix('admin')->group(function () {
         Route::get('/games/bet-records',  [GameController::class, 'betRecords']);
 
         // Referrals (ระบบแนะนำเพื่อน)
-        Route::get('/referrals', function (\Illuminate\Http\Request $request) {
-            $query = \App\Models\User::withCount(['referrals as referred_count'])
-                ->orderBy('referred_count', 'desc');
-            if ($request->filled('search')) {
-                $search = $request->search;
-                $query->where('username', 'like', "%{$search}%")
-                      ->orWhere('referral_code', 'like', "%{$search}%");
-            }
-            return response()->json(['data' => $query->paginate(50)]);
-        });
+        Route::get('/referrals', [\App\Http\Controllers\Internal\InternalAdminController::class, 'referrals']);
 
                 // อัปโหลดรูปแรงค์
         Route::post('/ranks/upload-image', [\App\Http\Controllers\Admin\AdminRankController::class, 'uploadImage']);
