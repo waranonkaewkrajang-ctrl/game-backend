@@ -226,6 +226,34 @@ class InternalAdminWritesTest extends TestCase
         $this->assertSame('100.00', $this->balance());
     }
 
+    public function test_adjust_tickets_and_points_from_member_page(): void
+    {
+        DB::table('wallets')->where('user_id', $this->user->id)->update(['ticket_balance' => 3, 'point_balance' => 10.5]);
+        $base = "/api/internal/admin/users/{$this->user->id}";
+
+        // + tickets, replay with the same key does not add twice
+        $this->postJson("$base/adjust-tickets", ['amount' => 5, 'description' => 'Admin เพิ่มวงล้อ'], $this->headers('tickets-00000000001'))
+            ->assertStatus(200)->assertJsonPath('data.ticket_balance', 8);
+        $this->postJson("$base/adjust-tickets", ['amount' => 5, 'description' => 'Admin เพิ่มวงล้อ'], $this->headers('tickets-00000000001'))
+            ->assertStatus(200)->assertHeader('Idempotent-Replay', 'true');
+        $this->assertSame(8, (int) DB::table('wallets')->where('user_id', $this->user->id)->value('ticket_balance'));
+
+        // − more than the balance → refused, nothing changes, no history row
+        $this->postJson("$base/adjust-tickets", ['amount' => -9], $this->headers('tickets-00000000002'))->assertStatus(400);
+        $this->assertSame(8, (int) DB::table('wallets')->where('user_id', $this->user->id)->value('ticket_balance'));
+        $this->postJson("$base/adjust-tickets", ['amount' => 1.5], $this->headers('tickets-00000000003'))->assertStatus(422);
+
+        $tx = DB::table('transactions')->where('user_id', $this->user->id)->where('type', 'ticket_adjust')->get();
+        $this->assertCount(1, $tx);
+        $this->assertSame([3, 8, 'in'], [(int) $tx[0]->balance_before, (int) $tx[0]->balance_after, $tx[0]->direction]);
+        $this->assertNotEmpty($tx[0]->processed_by);
+
+        // points keep their satang (decimal column)
+        $this->postJson("$base/adjust-points", ['amount' => -2], $this->headers('points-000000000001'))
+            ->assertStatus(200)->assertJsonPath('data.point_balance', 8.5);
+        $this->assertSame('8.50', number_format((float) DB::table('wallets')->where('user_id', $this->user->id)->value('point_balance'), 2));
+    }
+
     public function test_in_flight_key_returns_409(): void
     {
         $url = "/api/internal/admin/users/{$this->user->id}/adjust";

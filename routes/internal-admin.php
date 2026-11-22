@@ -15,7 +15,8 @@
 |
 | Deliberately NOT exposed: API token management (credentials), bank-incoming ingest/resume (bot only),
 | marketing/export (bulk personal data), truewallet match/ignore, spin-wheel give-tickets,
-| adjust-tickets/points, unmatched-deposits store — not used by the unified admin pages.
+| unmatched-deposits store — not used by the unified admin pages.
+| (users/{user}/adjust-tickets + adjust-points ARE exposed: the member page +/- for spin tickets and points.)
 */
 
 use App\Http\Controllers\Admin\AdminActivityController;
@@ -134,6 +135,8 @@ Route::prefix('internal/admin')
             Route::post('/users',                                 [AdminUserController::class, 'store']);
             Route::put('/users/{user}',                           [AdminUserController::class, 'update'])->whereNumber('user');
             Route::post('/users/{user}/adjust',                   [AdminUserController::class, 'adjustBalance'])->whereNumber('user');
+            Route::post('/users/{user}/adjust-tickets',           [AdminUserController::class, 'adjustTickets'])->whereNumber('user');
+            Route::post('/users/{user}/adjust-points',            [AdminUserController::class, 'adjustPoints'])->whereNumber('user');
             Route::post('/users/{user}/bonus',                    [AdminUserController::class, 'giveBonus'])->whereNumber('user');
             Route::post('/users/{user}/turnover/{claim}/cancel',  [AdminUserController::class, 'cancelTurnover'])->whereNumber(['user', 'claim']);
             Route::post('/users/{user}/reset-password',           [InternalAdminController::class, 'resetMemberPassword'])->whereNumber('user');

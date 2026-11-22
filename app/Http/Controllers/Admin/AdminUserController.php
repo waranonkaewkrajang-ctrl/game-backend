@@ -455,91 +455,72 @@ class AdminUserController extends Controller
 
     public function adjustTickets(Request $request, User $user): JsonResponse
     {
-        $data = $request->validate([
-            'amount'      => 'required|integer|not_in:0',
-            'description' => 'nullable|string|max:255',
-        ]);
-
-        $wallet = $user->wallet;
-        if (!$wallet) {
-            return response()->json(['status' => 'error', 'message' => 'ไม่พบ wallet'], 404);
-        }
-
-        $before = $wallet->ticket_balance;
-        if ($data['amount'] > 0) {
-            $wallet->increment('ticket_balance', $data['amount']);
-        } else {
-            if ($before + $data['amount'] < 0) {
-                return response()->json(['status' => 'error', 'message' => 'ตั๋วไม่พอหัก'], 400);
-            }
-            $wallet->decrement('ticket_balance', abs($data['amount']));
-        }
-
-        \DB::table('transactions')->insert([
-            'user_id' => $user->id,
-            'reference_id' => 'TKT-' . date('Ymd') . '-' . strtoupper(substr(uniqid(), -8)),
-            'type' => 'ticket_adjust',
-            'direction' => $data['amount'] > 0 ? 'in' : 'out',
-            'amount' => abs($data['amount']),
-            'balance_before' => $before,
-            'balance_after' => $wallet->fresh()->ticket_balance,
-            'description' => $data['description'] ?? 'ปรับตั๋ววงล้อ',
-            'meta' => json_encode(['adjusted_by' => $request->user()->id]),
-            'status' => 'completed',
-            'processed_by' => $request->user()->id,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        return response()->json([
-            'status'  => 'success',
-            'message' => "ปรับตั๋วสำเร็จ ({$data['amount']} ใบ)",
-            'data'    => ['ticket_balance' => $wallet->fresh()->ticket_balance],
-        ]);
+        return $this->adjustCounter($request, $user, 'ticket_balance', 'ticket_adjust', 'TKT', 'ปรับตั๋ววงล้อ', 'ตั๋วไม่พอหัก', 'ปรับตั๋วสำเร็จ', 'ใบ');
     }
 
     public function adjustPoints(Request $request, User $user): JsonResponse
     {
+        return $this->adjustCounter($request, $user, 'point_balance', 'point_adjust', 'PNT', 'ปรับคะแนน', 'คะแนนไม่พอหัก', 'ปรับคะแนนสำเร็จ', 'คะแนน');
+    }
+
+    /**
+     * ปรับตั๋ววงล้อ / คะแนน ของลูกค้า (แอดมินกด + / −)
+     * ล็อกแถว wallet + ทำในรายการเดียว → ยอดไม่ติดลบเมื่อมีการหัก/เพิ่มพร้อมกัน (เช่น ลูกค้ากำลังหมุนวงล้อ)
+     * และยอดเปลี่ยนก็ต่อเมื่อบันทึกประวัติ transactions สำเร็จด้วย
+     */
+    private function adjustCounter(Request $request, User $user, string $column, string $type, string $prefix,
+                                   string $defaultDescription, string $notEnoughMessage, string $doneMessage, string $unit): JsonResponse
+    {
         $data = $request->validate([
-            'amount'      => 'required|integer|not_in:0',
+            'amount'      => 'required|integer|not_in:0|min:-1000000|max:1000000',
             'description' => 'nullable|string|max:255',
         ]);
+        $amount  = (int) $data['amount'];
+        $adminId = $request->user()->id;
 
-        $wallet = $user->wallet;
-        if (!$wallet) {
-            return response()->json(['status' => 'error', 'message' => 'ไม่พบ wallet'], 404);
-        }
-
-        $before = $wallet->point_balance;
-        if ($data['amount'] > 0) {
-            $wallet->increment('point_balance', $data['amount']);
-        } else {
-            if ($before + $data['amount'] < 0) {
-                return response()->json(['status' => 'error', 'message' => 'คะแนนไม่พอหัก'], 400);
+        $result = \DB::transaction(function () use ($user, $column, $type, $prefix, $defaultDescription, $data, $amount, $adminId) {
+            $wallet = \App\Models\Wallet::where('user_id', $user->id)->lockForUpdate()->first();
+            if (!$wallet) {
+                return ['error' => 'ไม่พบ wallet', 'code' => 404];
             }
-            $wallet->decrement('point_balance', abs($data['amount']));
-        }
 
-        \DB::table('transactions')->insert([
-            'user_id' => $user->id,
-            'reference_id' => 'PNT-' . date('Ymd') . '-' . strtoupper(substr(uniqid(), -8)),
-            'type' => 'point_adjust',
-            'direction' => $data['amount'] > 0 ? 'in' : 'out',
-            'amount' => abs($data['amount']),
-            'balance_before' => $before,
-            'balance_after' => $wallet->fresh()->point_balance,
-            'description' => $data['description'] ?? 'ปรับคะแนน',
-            'meta' => json_encode(['adjusted_by' => $request->user()->id]),
-            'status' => 'completed',
-            'processed_by' => $request->user()->id,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            // ticket_balance = int · point_balance = decimal(15,2) → keep the satang, never truncate
+            $before = $column === 'ticket_balance' ? (int) $wallet->{$column} : round((float) $wallet->{$column}, 2);
+            $after  = $column === 'ticket_balance' ? $before + $amount : round($before + $amount, 2);
+            if ($after < 0) {
+                return ['error' => null, 'code' => 400];
+            }
+
+            $wallet->{$column} = $after;
+            $wallet->save();
+
+            \DB::table('transactions')->insert([
+                'user_id'        => $user->id,
+                'reference_id'   => $prefix . '-' . date('Ymd') . '-' . strtoupper(substr(uniqid(), -8)),
+                'type'           => $type,
+                'direction'      => $amount > 0 ? 'in' : 'out',
+                'amount'         => abs($amount),
+                'balance_before' => $before,
+                'balance_after'  => $after,
+                'description'    => $data['description'] ?? $defaultDescription,
+                'meta'           => json_encode(['adjusted_by' => $adminId]),
+                'status'         => 'completed',
+                'processed_by'   => $adminId,
+                'created_at'     => now(),
+                'updated_at'     => now(),
+            ]);
+
+            return ['after' => $after];
+        });
+
+        if (isset($result['code'])) {
+            return response()->json(['status' => 'error', 'message' => $result['error'] ?? $notEnoughMessage], $result['code']);
+        }
 
         return response()->json([
             'status'  => 'success',
-            'message' => "ปรับคะแนนสำเร็จ ({$data['amount']} คะแนน)",
-            'data'    => ['point_balance' => $wallet->fresh()->point_balance],
+            'message' => "{$doneMessage} ({$amount} {$unit})",
+            'data'    => [$column => $result['after']],
         ]);
     }
 
